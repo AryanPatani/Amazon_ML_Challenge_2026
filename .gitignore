@@ -2,3 +2,22 @@
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Large datasets
+data/
+dataset/
+*.tsv
+*.csv
+*.parquet
+
+# Virtual environments & OS
+.DS_Store
+.venv/
+venv/
+env/
+
+# Model checkpoints & embeddings
+*.pt
+*.bin
+*.onnx
+*.safetensors

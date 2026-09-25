@@ -4,7 +4,7 @@ eval/f05.py  — Ticket 0.2
 Macro-averaged F0.5 metric for the Amazon ML Challenge 2026 Entity Resolution task.
 
 Usage (CLI):
-    python -m eval.f05 --pred predictions.tsv --gt dataset/train/train_labels.tsv
+    python -m eval.f05 evaluate --pred predictions.tsv --gt data/dataset/train/train_ground_truth.tsv
 
 Usage (Python):
     from eval.f05 import macro_f05, compute_f05
@@ -117,16 +117,33 @@ def macro_f05(
 def _load_tsv_predictions(path: str | Path) -> dict[str, list[str]]:
     """Load a submission/prediction TSV into a {s1_id: [ids]} dict.
 
-    Format: source1_entity_id \\t matches
-    where matches is comma-separated IDs or empty string.
+    Format: source1_entity_id \\t matched_entity_ids
+    where matched_entity_ids is comma-separated IDs or empty string.
+    Supports 'matches' as a fallback column name for backward compatibility.
     """
     df = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
+
+    if "source1_entity_id" not in df.columns:
+        raise KeyError(
+            f"Missing required column 'source1_entity_id' in {path}. "
+            f"Available columns: {list(df.columns)}"
+        )
+
+    if "matched_entity_ids" in df.columns:
+        match_col = "matched_entity_ids"
+    elif "matches" in df.columns:
+        match_col = "matches"
+    else:
+        raise KeyError(
+            f"Missing required column: neither 'matched_entity_ids' nor 'matches' "
+            f"found in {path}. Available columns: {list(df.columns)}"
+        )
+
     out: dict[str, list[str]] = {}
-    for _, row in df.iterrows():
-        s1_id = row["source1_entity_id"]
-        cell  = str(row.get("matches", "")).strip()
-        ids   = [x.strip() for x in cell.split(",") if x.strip()] if cell else []
-        out[s1_id] = ids
+    for s1_id, cell in zip(df["source1_entity_id"], df[match_col]):
+        cell = str(cell).strip()
+        ids = [x.strip() for x in cell.split(",") if x.strip()] if cell else []
+        out[str(s1_id)] = ids
     return out
 
 
@@ -349,9 +366,35 @@ def _run_self_tests() -> None:
     #   scores: [1.0, 0.833, 1.0, 0.556, 0.0, 1.0, 0.667]  → sum=5.056 → /7=0.7223
     # Close enough given PDF rounding. Our formula is verified correct.
 
+    # --- test _load_tsv_predictions with matched_entity_ids and matches ---
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. matched_entity_ids column
+        p1 = Path(tmpdir) / "pred_matched_entity_ids.tsv"
+        p1.write_text("source1_entity_id\tmatched_entity_ids\nS1-1\tS2-A,S3-B\nS1-2\t\n")
+        loaded1 = _load_tsv_predictions(p1)
+        assert loaded1 == {"S1-1": ["S2-A", "S3-B"], "S1-2": []}, f"Failed loading matched_entity_ids: {loaded1}"
+
+        # 2. matches column (backward compatibility)
+        p2 = Path(tmpdir) / "pred_matches.tsv"
+        p2.write_text("source1_entity_id\tmatches\nS1-1\tS2-A,S3-B\nS1-2\t\n")
+        loaded2 = _load_tsv_predictions(p2)
+        assert loaded2 == {"S1-1": ["S2-A", "S3-B"], "S1-2": []}, f"Failed loading matches: {loaded2}"
+
+        # 3. Missing match column raises KeyError
+        p3 = Path(tmpdir) / "pred_invalid.tsv"
+        p3.write_text("source1_entity_id\twrong_col\nS1-1\tS2-A\n")
+        try:
+            _load_tsv_predictions(p3)
+            raise AssertionError("Should have raised KeyError for missing match column")
+        except KeyError:
+            pass
+
     print("All self-tests PASSED ✓")
     print(f"  5-entity macro F0.5 = {result:.4f} (formula verified)")
     print(f"  7-entity macro F0.5 = {r7:.4f} (formula verified)")
+    print("  TSV prediction loading tested for 'matched_entity_ids' and 'matches'.")
     print("  The PS target of 0.714 is confirmed achievable with the correct formula.")
 
 
@@ -365,18 +408,33 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="cmd")
 
+    default_gt = (
+        Path("data/dataset/train/train_ground_truth.tsv")
+        if Path("data/dataset/train/train_ground_truth.tsv").exists()
+        else (
+            Path("dataset/train/train_ground_truth.tsv")
+            if Path("dataset/train/train_ground_truth.tsv").exists()
+            else Path("data/dataset/train/train_labels.tsv")
+        )
+    )
+    default_s1 = (
+        Path("data/dataset/train/train_source1.tsv")
+        if Path("data/dataset/train/train_source1.tsv").exists()
+        else Path("dataset/train/train_source1.tsv")
+    )
+
     # evaluate command
     ev = sub.add_parser("evaluate", help="Evaluate a prediction TSV against ground truth")
     ev.add_argument("--pred", required=True, type=Path, help="Prediction TSV path")
-    ev.add_argument("--gt",   required=True, type=Path, help="Ground truth TSV path")
+    ev.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV path (default: {default_gt})")
 
     # test command
     sub.add_parser("test", help="Run built-in self-tests")
 
     # val-split command
     vs = sub.add_parser("val-split", help="Create stratified train/val split")
-    vs.add_argument("--s1",   required=True, type=Path, help="train_source1.tsv path")
-    vs.add_argument("--gt",   required=True, type=Path, help="Ground truth TSV path")
+    vs.add_argument("--s1",   default=default_s1, type=Path, help=f"train_source1.tsv path (default: {default_s1})")
+    vs.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV path (default: {default_gt})")
     vs.add_argument("--frac", default=0.2, type=float, help="Val fraction (default 0.2)")
 
     args = parser.parse_args()
@@ -390,11 +448,7 @@ def main() -> None:
 
     elif args.cmd == "val-split":
         s1 = pd.read_csv(args.s1, sep="\t", dtype=str, keep_default_na=False)
-        gt_df = pd.read_csv(args.gt, sep="\t", dtype=str, keep_default_na=False)
-        gt: dict[str, list[str]] = {}
-        for _, row in gt_df.iterrows():
-            cell = str(row.get("matches", "")).strip()
-            gt[row["source1_entity_id"]] = [x.strip() for x in cell.split(",") if x.strip()] if cell else []
+        gt = _load_tsv_ground_truth(args.gt)
         train_ids, val_ids = make_val_split(s1, gt, val_fraction=args.frac)
         print(f"Train: {len(train_ids):,} | Val: {len(val_ids):,}")
 

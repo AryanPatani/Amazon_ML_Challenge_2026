@@ -52,8 +52,8 @@ def load_source(path: str | Path, expected_prefix: Optional[str] = None) -> pd.D
 def load_ground_truth(path: str | Path) -> pd.DataFrame:
     """Load the ground-truth TSV file.
 
-    Expected columns: ``source1_entity_id``, ``matches``  (tab-separated).
-    The ``matches`` column contains either an empty string (singleton) or a
+    Expected columns: ``source1_entity_id``, ``matched_entity_ids`` (or ``matches``) (tab-separated).
+    The matches column contains either an empty string (singleton) or a
     comma-separated list of S2/S3 entity IDs.
 
     Returns
@@ -63,10 +63,18 @@ def load_ground_truth(path: str | Path) -> pd.DataFrame:
         - matches           (list[str]): may be empty list for singletons
     """
     df = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
-    required = {"source1_entity_id", "matches"}
-    missing = required - set(df.columns)
-    if missing:
-        raise ValueError(f"Ground truth file {path} is missing columns: {missing}")
+
+    if "source1_entity_id" not in df.columns:
+        raise ValueError(f"Ground truth file {path} is missing column: 'source1_entity_id'")
+
+    if "matched_entity_ids" in df.columns:
+        match_col = "matched_entity_ids"
+    elif "matches" in df.columns:
+        match_col = "matches"
+    else:
+        raise ValueError(
+            f"Ground truth file {path} is missing column: expected 'matched_entity_ids' or 'matches'"
+        )
 
     def _parse(cell: str) -> list[str]:
         cell = cell.strip()
@@ -74,12 +82,12 @@ def load_ground_truth(path: str | Path) -> pd.DataFrame:
             return []
         return [x.strip() for x in cell.split(",") if x.strip()]
 
-    df["matches"] = df["matches"].apply(_parse)
+    df["matches"] = df[match_col].apply(_parse)
     return df
 
 
 def load_all_sources(
-    train_dir: str | Path,
+    train_dir: str | Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Convenience loader for the full training set.
 
@@ -87,16 +95,24 @@ def load_all_sources(
     -------
     (source1, source2, source3, ground_truth)
     """
-    train_dir = Path(train_dir)
+    if train_dir is None:
+        train_dir = Path("data/dataset/train") if Path("data/dataset/train").exists() else Path("dataset/train")
+    else:
+        train_dir = Path(train_dir)
+
     s1 = load_source(train_dir / "train_source1.tsv", expected_prefix="S1-")
     s2 = load_source(train_dir / "train_source2.tsv", expected_prefix="S2-")
     s3 = load_source(train_dir / "train_source3.tsv", expected_prefix="S3-")
-    gt = load_ground_truth(train_dir / "train_labels.tsv")
+
+    gt_file = train_dir / "train_ground_truth.tsv"
+    if not gt_file.exists():
+        gt_file = train_dir / "train_labels.tsv"
+    gt = load_ground_truth(gt_file)
     return s1, s2, s3, gt
 
 
 def load_test_sources(
-    test_dir: str | Path,
+    test_dir: str | Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Convenience loader for the test set (no labels available).
 
@@ -104,7 +120,11 @@ def load_test_sources(
     -------
     (source1, source2, source3)
     """
-    test_dir = Path(test_dir)
+    if test_dir is None:
+        test_dir = Path("data/dataset/test") if Path("data/dataset/test").exists() else Path("dataset/test")
+    else:
+        test_dir = Path(test_dir)
+
     s1 = load_source(test_dir / "test_source1.tsv", expected_prefix="S1-")
     s2 = load_source(test_dir / "test_source2.tsv", expected_prefix="S2-")
     s3 = load_source(test_dir / "test_source3.tsv", expected_prefix="S3-")

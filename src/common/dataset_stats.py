@@ -2,7 +2,8 @@
 Ticket 0.1 — Data stats script
 
 Run with:
-    python -m src.common.dataset_stats --train-dir dataset/train --test-dir dataset/test
+    python -m src.common.dataset_stats --train-dir data/dataset/train --test-dir data/dataset/test
+    # (or simply `python -m src.common.dataset_stats` using defaults)
 
 Prints:
   - Row counts and country distributions for S1, S2, S3
@@ -268,7 +269,13 @@ def main(train_dir: Path, test_dir: Path) -> None:
     s1 = pd.read_csv(train_dir / "train_source1.tsv", sep="\t", dtype=str, keep_default_na=False)
     s2 = pd.read_csv(train_dir / "train_source2.tsv", sep="\t", dtype=str, keep_default_na=False)
     s3 = pd.read_csv(train_dir / "train_source3.tsv", sep="\t", dtype=str, keep_default_na=False)
-    gt = pd.read_csv(train_dir / "train_labels.tsv",  sep="\t", dtype=str, keep_default_na=False)
+
+    gt_file = train_dir / "train_ground_truth.tsv"
+    if not gt_file.exists():
+        gt_file = train_dir / "train_labels.tsv"
+    gt = pd.read_csv(gt_file, sep="\t", dtype=str, keep_default_na=False)
+    if "matches" not in gt.columns and "matched_entity_ids" in gt.columns:
+        gt["matches"] = gt["matched_entity_ids"]
 
     basic_stats("train_source1 (S1)", s1)
     basic_stats("train_source2 (S2)", s2)
@@ -288,8 +295,11 @@ def main(train_dir: Path, test_dir: Path) -> None:
 
 
 if __name__ == "__main__":
+    default_train = "data/dataset/train" if Path("data/dataset/train").exists() else "dataset/train"
+    default_test = "data/dataset/test" if Path("data/dataset/test").exists() else "dataset/test"
+
     parser = argparse.ArgumentParser(description="Ticket 0.1 — Dataset EDA and stats")
-    parser.add_argument("--train-dir", default="dataset/train", type=Path)
-    parser.add_argument("--test-dir",  default="dataset/test",  type=Path)
+    parser.add_argument("--train-dir", default=default_train, type=Path)
+    parser.add_argument("--test-dir",  default=default_test,  type=Path)
     args = parser.parse_args()
     main(args.train_dir, args.test_dir)
