@@ -1,0 +1,369 @@
+
+====================================================================================================
+STEP 1 — Basic load and shape
+====================================================================================================
+
+train_source1: 2,206,821 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+US       1323633
+India     883188
+checks:
+  empty business_name: 0
+  empty business_address: 0
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 604.43 MiB
+
+train_source2: 5,034,616 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+US       3016817
+India    2017799
+checks:
+  empty business_name: 0
+  empty business_address: 168967
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 1.39 GiB
+
+train_source3: 5,285,603 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+US       3170056
+India    2115547
+checks:
+  empty business_name: 0
+  empty business_address: 175916
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 1.45 GiB
+
+train_ground_truth: 2,206,821 rows
+columns: ['source1_entity_id', 'matched_entity_ids']
+memory: 323.17 MiB
+
+test_source1: 1,732,544 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+India     809986
+US        663106
+France    259452
+checks:
+  empty business_name: 0
+  empty business_address: 0
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 485.89 MiB
+
+test_source2: 4,887,273 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+India     2312565
+US        1871330
+France     703378
+checks:
+  empty business_name: 0
+  empty business_address: 129408
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 1.39 GiB
+
+test_source3: 5,082,316 rows
+columns: ['entity_id', 'business_name', 'business_address', 'country']
+country counts:
+country
+India     2405000
+US        1945701
+France     731615
+checks:
+  empty business_name: 0
+  empty business_address: 136098
+  duplicate entity_id rows: 0
+  wrong entity_id prefix: 0
+  memory: 1.42 GiB
+
+====================================================================================================
+STEP 2 — Raw samples (fixed random_state=42; no string truncation)
+====================================================================================================
+
+train_source1 — 20 rows
+   entity_id                             business_name                                                                                                       business_address country
+ S1-53356671                   Pediatric Medicine PLLC                                                                                                    4850 20, Otisco, NY      US
+S1-320151505                      Fetech National Twin                                                                                      19034 Woodburn Road, Woodburn, IN      US
+S1-938947364            General Design Innovations LLC                                                                                            7241 Osage Avenue, Mesa, AZ      US
+S1-195839862 Construction Ideaz Papers Private Limited          Building No.4/606, Prabhul Cottage Karimbalur, Elakamon, Ayiroor P.O., Thiruvananthapuram, Trivandrum, Kerala   India
+S1-655046555            Penaloza and Bittle First Inc.                                                                                   4255 Charleswood Avenue, Memphis, TN      US
+S1-758070915                  National Investments LLC                                                                                       1641 Virginia Lane, Hueytown, AL      US
+S1-169338169                        Reus Idaho Company                                                                                     Sanford, ME, 31 Guillemette Street      US
+S1-796421498                 Creative Projects Limited 12Thfloor, C, 1204, Roya Oasis, Jankalyan Nagarmalvani, Nr Billabong School, Malad W, Mumbai, Mumbai City, Maharashtra   India
+S1-802535179                            Goar Stone LLC                                                                                   2105 Wood Ridge Cove, Cedar Park, TX      US
+ S1-97176033       Lakshmi Consultants Private Limited                                                         A-301, New Sai Dham Chsl, Ramdev Park Road, Thane, Maharashtra   India
+S1-983540069             Ss Technology Private Limited                        Shop No. 1164, Pvt No.2, First Floor Kucha Mahajani, Chandni Chowk, Delhi, Central Delhi, Delhi   India
+S1-642488269                Rebbecca's Family Practice                                                                                         2514 Messick Drive, Goshen, IN      US
+S1-426953208                      Heritage Society LLC                                                                                      139 Fort Graham Road, Whitney, TX      US
+S1-818320211                        Rozy Media Limited                                     Survey Number 127/P1, Opp, 66 Kv Ss, Varetha, Mahesana, Kheralu, Mahesana, Gujarat   India
+ S1-33984562                                Slate PLLC                                                                                   735 Charlton Street, Southbridge, MA      US
+S1-709960468                               Apex Center                                                                                        4 Hillside Court, Coxsackie, NY      US
+S1-986840295                   M 9 Certified Giant LLC                                                                                       4122 Scenic Drive, Dickinson, TX      US
+S1-836296604      Coromandal Marketing Private Limited                   G-3, Neel Madhav, Valji Ladha Cross Road, Near Hiera Mongi Hospital, Mulund (W), Mumbai, Maharashtra   India
+S1-975412735            Preferred Business Systems Inc                                                                                Loudoun County, 23355 Florina Court, VA      US
+S1-739708548                  Dream Investment Pvt Ltd                           2A, 2Nd Floor, Windcliffe, 50 D Peddar Road, Cumballa Hill, Mumbai, Mumbai City, Maharashtra   India
+
+train_source2 — 20 rows
+   entity_id                                    business_name                                                                              business_address country
+ S2-61703745                                   Harbor  Center                                                             6309 EVANGELINE TRAIL, AUSTIN, TX      US
+S2-420680068                              STEWARD ACE PREMIER                                                               1029 MAPLE HILL RD, LEBANON, TN      US
+S2-190917211                                 Klapper and Lott                                                                   368 VINE STREET, TOOELE, UT      US
+S2-109564077                           EAR NOSE & THROAT CARE                                                                      YORK RD, LUTHERVILLE, MD      US
+S2-483058783                Shield Inrfabuild Private Limited           206 FLAT NO. LG 1 KH NO. 514, 516 SHYAM BHAWAN JHANDA COLONY FATEHPUR, DELHI, Delhi   India
+S2-257746699                                        #holtline                                                          HOUSTON, 6119 DARLINGHURST DRIVE, TX      US
+S2-476138086                                Cancer [Services]                                                                                                    US
+S2-420894180                Smt Hermes Private Limited Center             Delhi, HOUSE NO 138, 2ND FLOOR, BLK C, PKT 2 DDA MARKET, SECTOR 16, ROHINI, DELHI   India
+S2-498993768                   AMARDEEP  PTER PRIVATE LIMITED                                      332NEAR TELCO SERVICE STATION RANGPURI, NEW DELHI, Delhi   India
+ S2-54193377                                 Impex-+-Brothers            FLAT B 1801, PL-15&17, SECTOR 7, PATEL HERITAGE, KHARGHAR, NAVI MUMBAI, महाराष्ट्र   India
+S2-721297669                   Anderson & Barney Patriot Corp                                                                 218 19TH TER, KANSAS CITY, MO      US
+S2-299697282                            Halkos Blockchain Inc                                                      3154-3158 PETERKIN AVENUE, ANCHOARGE, AK      US
+S2-273907271                 Oyola Líberty Harmony Associates                                                                   601 SPRUCE STREET, IOLA, KS      US
+S2-595122948                         ग्रेट टेक केयर प्रा. लि.          C/O. BABU YALLAPPA WADAR, A/P- KUDNUR, TAL CHANDGAD, KOLHAPUR, CHANDGAD, Maharashtra   India
+S2-472836160                                  HEALTH  AALMLCE                                                      2975 1/2 GLENMARE ST, SALT LAKE CITY, UT      US
+S2-550687702                        Indorama Inn (India)  Ltd            GROUND FLOOR, BEARING NO.0102, IN POCKET-15, ROHINI SECTOR-22, DELHI, null, दिल्ली   India
+S2-337429097                         HODZIC  FASHION SERVICES                                                         1507 BELL STREET, GREENACRES CITY, WA      US
+S2-163014489                              Sri PATERSON  GROUP                            NO. 208 B 2/101B FIRST FLOOR, SAFDARJUNG ENCLAVE, NEW DELHI, Delhi   India
+S2-473939517 TECH PRIVATE FINANCIAL VENTURES TIRUPATI LIMITED 87 MUTHOOT CENTRE, TC NO 27/ 3022 PUNNEN ROAD, THIRUVANANTHAPURAM, THIRUVANANTHAPURAM, Kerala   India
+S2-105896641                  Signature Wealth Works Partners                                                             235 SHANNON ST, TAZEWELL TOWN, VA      US
+
+train_source3 — 20 rows
+   entity_id                     business_name                                                                                              business_address country
+S3-239979459          Dr Apex Pvt Ltd Partners                                                                75 Tulshibaugwale Colonysahakarnagar, Pune, MH   India
+S3-109491785              Shiva  Mines Pvt Ltd                                                     F-17, Sector 22, Noida, Gautam Buddha Nagar, उत्तर प्रदेश   India
+S3-586835953    Vanguard Métropolitan Sunshine                                                                        3518-B Crestview Ln, Catoosa, Oklahoma      US
+S3-449000694                Vanguard Apoge-Inc                                                                                2150 350, Greencastle, Indiana      US
+S3-397034729       रियल एग्रो प्राइवेट लिमिटेड                                                                      H.no 829 D-225vivek Vihar, Delhi, दिल्ली   India
+S3-553748449                           Irinovi                                                                            324 Laramie Ave, Chicago, Illinois      US
+S3-787185173             Jarleon Worldwide Llc                                                                      353 Spruce Pine Road, Abingdon, Maryland      US
+S3-691178620                 Sfoasseeg  L.L.C.                                                                          1161d Brookside Ave, Evansdale, Iowa      US
+S3-138902486 Brixhalo t/a Creative Enterprises                                                                           6, Madurai Road, Trichy, Tamil Nadu   India
+S3-568450939        Nachiket Solutions Limited                                     138 / 6, Kiran Complex Zone - Ii, M. P. Nagar Bhopal, Bhopal, मध्य प्रदेश   India
+S3-468440022          Tolbert Pacific Southern                                                                                  476 475, Bloomfield, Indiana      US
+S3-451416708             New Dhei Products LLP                                                                  North Delhi, New Delhi, 13 A Kamla Nagar, DL   India
+S3-569241237         Primary  Care Associates,                                                                     6175 Twentieth Street, Rockford, Illinois      US
+S3-976491069     Mavis Mincey Optimal-Tungsten                                                                                                                    US
+S3-475009787                Valueanalytics.Com                                                                     Kansa CITY CITY, Missouri, Jackson Avenue      US
+ S3-69807298           Clear Clear Inc Medical                                                                         889 Morning Star Ct, Mason City, Iowa      US
+S3-451600706                    Sidhartha Kaka Kh.no. 31/5/1 And 2 Groud Floor, Village Salempur Majra Blk-h Street No 5 Uttrakhand Enclave, North Delhi, DL   India
+S3-347097728                     Vision Center                                                                            5 Palmer Street, # B, Athens, Ohio      US
+S3-764848577     Ashoka-+ Brothers Private Ltd                                                              Trivandrum, Tc-16/1776/5, Thiruvananthapuram, KL   India
+S3-881407444               Martin Inc Services                                                                        104 Woodland Drive, Richmond, Kentucky      US
+
+====================================================================================================
+STEP 3 — Ground-truth statistics
+====================================================================================================
+Source-1 rows in ground truth: 2,206,821
+Empty matched_entity_ids (singletons): 123,247 / 2,206,821 (5.58%)
+
+Match-count distribution for non-singleton Source-1 entities:
+matched_entity_ids
+1     119157
+2     375212
+3     530841
+4     484115
+5     321957
+6     164868
+7      63968
+8      18680
+9       4205
+10       534
+11        37
+min=1, max=11, mean=3.6660, median=4.0
+
+Matched-ID source composition:
+S2-: 3,693,619 / 7,638,365 (48.36%)
+S3-: 3,944,746 / 7,638,365 (51.64%)
+
+Source-1 / ground-truth coverage:
+duplicate source1_entity_id rows in ground truth: 0
+in train_source1 but not ground truth: 0
+in ground truth but not train_source1: 0
+
+====================================================================================================
+STEP 4 — Cross-check of the Source-1 deduplication assumption
+====================================================================================================
+Matched IDs associated with more than one distinct Source-1 ID: 0 / 7,638,365
+No matched ID is shared by multiple Source-1 entities.
+
+Ten shared-ID examples with source records:
+  None to print.
+
+====================================================================================================
+STEP 5 — Noise pattern inventory from matched pairs
+====================================================================================================
+Matched pairs joined to actual source records: 7,638,365
+Matched pairs with missing Source-1 record: 0
+identical name: 821,025 / 7,638,365 (10.75%)
+identical address: 553,282 / 7,638,365 (7.24%)
+differ in both: 6,307,292 / 7,638,365 (82.57%)
+
+Deterministic scan sample of matched pairs (25 US + 25 India when available):
+
+US examples (25):
+S1-971399383 | Delta Telecommunication Inc | 9914 Pierpont Avenue, Cleveland, OH || S2-49942811 | Delta Tetlecommunication Inc | 914 PIERPONT AVE, CLEVELAND, OH
+S1-886405942 | Lee and Lawson LLC | 1702 Pine Avenue, City Of Menomonie, WI || S2-138046867 | Lee and Lawson | 1702 Pine Avenue, CITY OF MENOMONIE, WI
+S1-735419880 | Eve's Highland Associates | 599 Pease Hill Road, Horicon, NY || S2-69394310 | heassociates.com | 599 PEASE HILL ROAD, HORICON, NY
+S1-640548212 | Asset Building Coalition P.C. | 8219 17th Street, Lake Stevens, WA || S2-868087865 | ASSET BUILDING COALITION LLC | 8219 17RD STREET, LAKE STEVENS, WA
+S1-25236554 | Olszewski Holding Company LLC | 218 Shoal Creek, James City County, VA || S2-795141272 | Olszewski Holding Company LLC LLC | 218 SHOAL CREEK, WILLIAMSBURG, VA
+S1-570696382 | Candy's Bakery | 313 Foxborough Drive, Brunswick City, OH || S2-414418413 | CANDY'S-SERVICES | 313 FOXBOROUGH DRIVE, BRUNSWICK, OH
+S1-728385931 | Crestline Clean | 1487 Highway 49, Ashland City, TN || S2-634015823 | Crestline Crestline Clean LP | HIGHWAY 49, ASHLAND CITY, TN
+S1-464464519 | Nion | 7100 Brigham Road, Henrico County, VA || S2-378707035 | Nion | 7100 BRIGHAM ROAD, HENRICO COUNTY, VA
+S1-916631587 | Keystone Odyssey | 1418 Meadowbrook Drive, Johnson City, TN || S2-953098128 | Keystone Odyssey Odyssey LLC | 1418 MEADOWBROOK DR, JOHNSON CITY, TN
+S1-233632079 | Sweet Barbershop | 5131 Copper Meadow Lane, West Jordan City, UT || S2-415733261 | Sweet Barbershop (Co) | 05131 COPPER MEADOW LN, WEST JORDAN CITY, UT
+S1-881196349 | Cobalt LLC | 110 Meadowbrook Acres, Candler, NC || S2-294835210 | COBALT  (LLC) | NC, CANLER, 110 MEADOWBROOK ACRES
+S1-107657509 | Piedmont Complete Chile LLC | 259 Cavalier Way, Unit 103, Burlington, NC || S2-944853638 | Piedmont Complete Chile  L.L.C. | 259 1/2 CAVALIER WAY, BURLINGTON, NC
+S1-987084238 | Empire School of Medicine | 477 Melissa Court, Gahanna, OH || S2-235039028 | Empire School of Medicine | 0477 MELISSA COURT, GAHANNA, OH
+S1-270688299 | Animal Welfare Network | 260 Cadillac Drive, Unit 83, Sacramento, CA || S2-783158461 | Animal Welfare Nétwork | 260 CADILLAC DR, SACRAMENTO, CA
+S1-14835803 | Hail, Harris & Roberts Inc | 8 Wentworth Avenue, Unit 1, Stoughton, MA || S2-669879950 | Hail, Harris & Roberts Inc | 8 WENTWORTH AVE, STOUGHTON, MA
+S1-807794639 | Behavioral Health Anchor Care Inc | 1715 Orchard Blossom Drive, City Of Appleton, WI || S2-673704658 | Behavioral Health Anchor Care | 1715-1719 Orchard Blossom Drive, CITY OF APPLETON, WI
+S1-508677632 | Division of Sanitation Inc. | 2178 Willow Lane, Peru, IN || S2-401480583 | Division of Sanitation | IN, 2178 WILLOW LANE, PERU
+S1-422702008 | Metro Coalition LLC | 56 Savory Lane, Felton, DE || S2-54307441 | LLC METRO COALTIMN | SAVORY LANE, FELTON, DE
+S1-508067967 | Eye Valley Medicine Inc | 39 Main Street, Savona, NY || S2-73037424 | Eye Valley Medicine Incorporated | 39 MAIN STREET, SAVONA, NY
+S1-371655629 | Direct Acadia | 647 Curtis Street, Toledo, OH || S2-332014708 | Direct Acadia Inc | CURTIS STREET, TOLEDO, OH
+S1-876559202 | Tataa Best Agriculture Inc. | 1225 Gumwood Drive, Lancaster, OH || S2-40574852 | TATAA BEST AGRICULTURE | 1225  GUMWOOD DRIVE, OH, PLEASANT TWP
+S1-914680916 | Solstice LLC | 103 Mccord Road, Roundup, MT || S2-208005980 | Solstice LLC | 303 MCCORD ROAD, ROUNDUP, MT
+S1-811202264 | Apex Preferred Strategy Inc | 2467 Eddins Road, Dothan, AL || S2-257885603 | Apex Preferred Strategy  Inc | 2467 EDDINS ROAD, DOTHAN, AL
+S1-957961173 | Doolittle, Harvey and Hardy | 2017 Cobblestone Drive, Cologne, MN || S2-125007797 | Doolittle, Hasvey and Hardy | 2017 COBBLESTONE DRIVE, COLOGNE, MN
+S1-960414035 | G P Starkey Motor | 7336 Maitland Lane, Charlotte, NC || S2-647437327 | G-P Starkey Motor | 7336 MAITLAND LN, CHARLOTTE, NC
+
+India examples (25):
+S1-160517054 | Foundation Excel Agency Private Limited | E-1, Bharat Nagar, 104/1/1 Erandwane, Pune, Maharashtra || S2-508602797 | FOUNDATION EXCEL AGENCY PRIVATE  LIMITED | HN 753 E-1, BHARAT NAGAR, 104/1/1 ERANDWANE, Maharashtra
+S1-876935271 | Real Modern Food Limited | Thane, Shop No. 4, Maharashtra, Plot No. 19, Sector 42, Nerul, Navi Mumbai || S2-566688803 | रियल मॉडर्न फूड लिमिटेड | SHP NO. G-4, PLOT NO. 19, SECTOR 42, NERUL, THANE, NAVI MUMBAI, Maharashtra
+S1-645089331 | Global Business Pvt Ltd | No. 21 - S, Icc, 5Th Street, B Sector, W Block, Ambattur, Chennai, Tamil Nadu || S2-879667609 | குளோபல் பிசினஸ் பிரைவேட் லிமிடெட் | #C-21 - S, AMBATTUR, CHENNAI, Tamil Nadu
+S1-879245051 | Altitude Retail | Malappuram, C7 419Bonny Building Kattoor P O, Thrissur, Kerala || S2-202057528 | Altitude Retail | C7 419BONNY BUILDING KATTOOR P O, MALAPPURAM, Kerala
+S1-363257525 | Core Welfare Society | Floor Blk-Q Rajeev Extn Village Karala Landmark Near, North West Delhi, Delhi, Plot No Q-17 Kh. No. 48/19 Ground Floor Only || S2-763108962 | Core Welfare Society LLP | PLOT NO Q-17 KH. NO. 48/19 GROUND FLOOR ONLY, FLOOR BLK-Q RAJEEV EXTN VILLAGE KARALA LANDMARK NEAR, DELHI, Delhi
+S1-574872837 | Classic Technologies Private Limited | Vrindavan Vihar, Dcm, Ajmer Road, Jaipur, 113, Rajasthan || S2-49714549 | CLASSIC [TECHNOLOGIES] | Rajasthan, HN G-103 113, VRINDAVAN VIHAR, DCM, AJMER ROAD, JAIPUR
+S1-400575981 | Swastik Impex Private Limited | 8-2-595/3/8A-8B, Eden Gardens, Road No.10, Khairatabad, Hyderabad, Telangana || S2-91305348 | Swastik Impex Private Ltd | 8-2-595/3/8A-8B, EDEN GARDENS, ROAD NO.10, KHAIRATABAD, Telangana
+S1-5746967 | Ambernath Solar Private Limited | Ambernath, Additional Midc Anand Nagar, Ambernath East, Maharashtra, Thane, Plot No B-78/1 || S2-978126813 | Private Ambernath Sólar Limited | PLOT NO B-78/1, ADDITIONAL MIDC ANAND NAGAR, AMBERNATH EAST, THANE, महाराष्ट्र
+S1-48150930 | Relic Products Private Limited | Gitgujari 4/8 Corner, Rajkot, Gujarat, Royal Archid Second Flor || S2-653150968 | prprivate.com | ROYAL ARCHID SECOND FLOR, GITGUJARI 4/8 CORNER, RAJKOT, Gujarat
+S1-444586960 | Tamanna & Brothers Private Limited | F No. 22 Golden Peak Chsl, 6Th Floor, Ambedkar Road, Mumbai, Maharashtra || S2-349287094 | TAMANNA and  BROTHERS PRIVATE LIMITED | F NO. 22 GOLDEN PEAK CHSL, 6TH FLOOR, AMBEDKAR ROAD, MUMBAI, Maharashtra
+S1-513959880 | Shakti Urban Products Private Limited | Shop No.F107 And F106, First Floor Soham Resicom, Vadodara, Gujarat || S2-348280942 | શક્તિ અર્બન પ્રોડક્ટ્સ પ્રાઇવેટ લિમિટેડ | SHOP NO.F107 AND F106, FIRST FLOOR SOHAM RESICOM, VADODARA, KALALI, Gujarat
+S1-953719315 | Radiant Marbles Private Limited | 23 Ganesh Peth, Off-No 107, Floor -1, Kak, Pune City, Pune, Maharashtra || S2-163588551 | Radiant Marbles  Private | NO 23 GANESH PETH, OFF-NO 107, FLOOR -1, KAK, PUNE CITY, Maharashtra
+S1-542567244 | Palani Kripa Private Limited | No. 004, 10Th Main 4 E Block, Rajajinagar, Bangalore, Karnataka || S2-102309877 | palani kripa private limited | NO. 04 , 10TH MAIN 4 E BLOCK, RAJAJINAGAR, BANGALORE, Karnataka
+S1-753616023 | Agro Sheron Hotels Private Limited | Benta Chowk, Darbhanga, Bihar || S2-423519674 | agrosheronhotels.com | BENTA CHOWK, DARBHANGA, Bihar
+S1-471355148 | Great Estate Private Limited | C/O:Madan Mohan Jha, Jaipur, Rajasthan, S/O:Sh Akhilesh Jha 166-A, Kalyan Nagar, Hajyawala Sanganeer, Jaipur || S2-224839523 | Great Estate Private Ltd | H.NO 13 C/O:MADAN MOHAN JHA, S/O:SH AKHILESH JHA 166-A, KALYAN NAGAR, HAJYAWALA SANGANEER, JAIPUR, राजस्थान
+S1-709534371 | Swayambhu Brothers LLP | House No 6-1-635/A, Khairtabad, Hyderabad, Telangana || S2-223038034 | SWAYAMBHU BROTHERS LLP | HOUSE NO 6-1-635/A, KHAIRTABAD, HYDERABAD, Telangana
+S1-510295888 | Alpha Al Technologies Private Limited | C-2 Greater Kailash Enclave Part-Ii, New Delhi, South Delhi, Delhi || S2-64510343 | अल्फा अल टेक्नोलॉजीज प्राइवेट लिमिटेड | NO 990 C-2 GREATER KAILASH ENCLAVE PART-II, NEW DELHI, SOUTH DELHI, Delhi
+S1-793135167 | Global Investment Pvt Ltd | Plot No. 74, Second Floor Zone-2, M.P. Nagar, Bhopal, Madhya Pradesh || S2-631299191 | ग्लोबल इन्वेस्टमेंट प्रा. लि. | PLOT NO. ##74, SECOND FLOOR ZONE-2, M.P. NAGAR, BHOPAL, मध्य प्रदेश
+S1-376853255 | Sree Ventures LLP | 77-1-2 Gandhipuram-3 Near, Priyanka Restaurant, Rajahmundry (Urban), East Godavari, Andhra Pradesh || S2-44100844 | Sree  Ventures | #77-1-2 GANDHIPURAM-3 NEAR, PRIYANKA RESTAURANT, RAJAHMUNDRY (URBAN), Andhra Pradesh
+S1-838531389 | Dubey Media Ltd | 701, Vishnu Chandra Sky, R A Kidwai Road, Wadala West, Mumbai, Maharashtra || S2-168770832 | Dubey Media (Ltd) | 701, VISHNU CHANDRA SKY, R A KIDWAI ROAD, WADALA WEST, MUMBAI, Maharashtra
+S1-557199090 | Vishal & Sons Private Limited | Psixl-3Rd Floor, Newtown Road, Unit No. 305, Po Rajarhat Gopalpur, Kolkata, Kolkata, Howrah, West Bengal || S2-829598251 | Vishal & Sons Private | NO. 28 PSIXL-3RD FLOOR, NEWTOWN ROAD, UNIT NO. 305, PO RAJARHAT GOPALPUR, KOLKATA, KOLKATA, পশ্চিমবঙ্গ
+S1-264713303 | Fortune Technology Private Limited | 22 Prince Anwar Shah Road, Merlin Oxford, Kolkata, Kolkata, Howrah, West Bengal || S2-67505679 | Fortune Private Limited Center | West Bengal, NO 22 PRINCE ANWAR SHAH ROAD, MERLIN OXFORD, KOLKATA, KOLKATA
+S1-158176499 | Muskan Netcomm Private Limited | Haryana, Gurgaon, Sector-7 Imt Manesar, Gurgaon, Plot No. 179 || S2-59544689 | Muskan Netcomm  Private Limited | 179 , SECTOR-7 IMT MANESAR, GURGAON, Haryana
+S1-875631699 | Bell Builders Center | B2 -004, Surya Nagara, Chandapura Anekal Tk, Lig 3, Bangalore, Karnataka, Bangalore || S2-895116270 | BELL BUILDERS CENTER LTD | LIG 3, B2 -004, SURYA NAGARA, CHANDAPURA ANEKAL TK, BANGALORE, Karnataka
+S1-215776772 | Country Real | Plot No.169, Rsc Ii S.N. 120, Versova, Andheri (West), Mumbai, Mumbai City, Maharashtra || S2-909528445 | *** Country  Real | 0169, MUMBAI, MUMBAI CITY, महाराष्ट्र
+
+====================================================================================================
+STEP 6 — Field length and format check (training source files)
+====================================================================================================
+
+train_source1 (2,206,821 rows)
+business_name length: min=3, max=105, mean=24.03
+business_address length: min=11, max=256, mean=52.07
+addresses with a 5–6 digit number: 147,257 (6.67%); without: 2,059,564 (93.33%)
+addresses containing 'near': 57,070 (2.59%)
+
+train_source2 (5,034,616 rows)
+business_name length: min=2, max=104, mean=25.10
+business_address length: min=0, max=249, mean=46.23
+addresses with a 5–6 digit number: 369,140 (7.33%); without: 4,665,476 (92.67%)
+addresses containing 'near': 111,318 (2.21%)
+
+train_source3 (5,285,603 rows)
+business_name length: min=2, max=123, mean=25.20
+business_address length: min=0, max=240, mean=46.71
+addresses with a 5–6 digit number: 385,727 (7.30%); without: 4,899,876 (92.70%)
+addresses containing 'near': 89,156 (1.69%)
+
+Top 30 business names across the three training sources:
+ 1. 'Primary Care': 741
+ 2. 'Physical Therapy': 707
+ 3. 'Womens Health': 676
+ 4. 'Urgent Care': 674
+ 5. 'Pediatric Dental': 661
+ 6. 'Pediatric Dentistry': 635
+ 7. 'Behavioral Health': 626
+ 8. 'Internal Medicine': 607
+ 9. 'earnosethroat.com': 507
+10. 'Meridian': 496
+11. 'Ear Nose & Throat': 458
+12. 'Eye Group': 455
+13. 'The Dent': 451
+14. 'Foot & Ankle': 440
+15. 'Straight Edge': 424
+16. 'Main Street': 423
+17. 'Pediatric Group': 403
+18. 'Family Center': 391
+19. 'Orthopedic Group': 379
+20. 'Back Alley': 377
+21. 'Dental Group': 374
+22. 'Cascade': 373
+23. 'Chiropractic Group': 371
+24. 'Vision Group': 361
+25. 'Dermatology Group': 353
+26. 'Apex': 353
+27. 'Commission on': 351
+28. 'Family Group': 347
+29. 'Pediatric': 347
+30. 'Oncology Group': 331
+Placeholder/junk-looking exact names observed: [('NA', 15), ('Na', 8)]
+
+====================================================================================================
+STEP 7 — Test-set sanity
+====================================================================================================
+
+test_source1: 1,732,544 rows; training counterpart: 2,206,821 rows
+country
+India     809986
+US        663106
+France    259452
+France present: True
+
+test_source2: 4,887,273 rows; training counterpart: 5,034,616 rows
+country
+India     2312565
+US        1871330
+France     703378
+France present: True
+
+test_source3: 5,082,316 rows; training counterpart: 5,285,603 rows
+country
+India     2405000
+US        1945701
+France     731615
+France present: True
+
+Test-folder label/ground-truth-like files: none found
+
+====================================================================================================
+STEP 8 — Parquet copies for fast reload
+====================================================================================================
+train_source1.tsv: TSV=200.34 MiB; Parquet=130.32 MiB
+train_source2.tsv: TSV=466.63 MiB; Parquet=316.59 MiB
+train_source3.tsv: TSV=480.37 MiB; Parquet=323.35 MiB
+train_ground_truth.tsv: TSV=121.13 MiB; Parquet=88.14 MiB
+test_source1.tsv: TSV=166.91 MiB; Parquet=105.29 MiB
+test_source2.tsv: TSV=485.86 MiB; Parquet=320.52 MiB
+test_source3.tsv: TSV=482.56 MiB; Parquet=319.94 MiB
+
+====================================================================================================
+STEP 9 — Clean summary
+====================================================================================================
+1. Row counts and country breakdown are printed in Steps 1 and 7.
+2. Singletons: 123,247 / 2,206,821 (5.58%). The full match-count distribution is printed in Step 3.
+3. Shared matched IDs: 0 IDs appear under more than one Source-1 entity.
+4. Empirical name/address examples and exact-field comparison rates are printed in Step 5.
+5. Data-quality checks (empty fields, duplicate IDs, prefixes, coverage, test labels) are printed in Steps 1, 3, and 7.
+6. Parquet copies were written to: C:\Kaam\Hackathon\Amazon ML Challenge 2026\amazon_ml_challenge_2026\dataset_parquet
