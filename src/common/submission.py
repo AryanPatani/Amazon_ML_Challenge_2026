@@ -1,6 +1,7 @@
 import os
 import subprocess
 import pandas as pd
+from src.common.paths import REPO_ROOT, TEST_DIR
 
 def write_submission_files(scored_pairs_df: pd.DataFrame, threshold: float, required_s1_ids: set, candidate_pairs_df: pd.DataFrame, output_dir: str = "output"):
     """
@@ -41,11 +42,14 @@ def write_submission_files(scored_pairs_df: pd.DataFrame, threshold: float, requ
 
     return matching_path, candidate_path
 
-def validate_submission(matching_path: str, candidate_path: str, test_dir: str = "data/raw/test", check_ids: bool = False):
+def validate_submission(matching_path: str, candidate_path: str, test_dir: str = None, check_ids: bool = False):
     """
     Runs the official validator script.
     """
-    script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scripts", "validate_submission.py")
+    if test_dir is None:
+        test_dir = str(TEST_DIR)
+
+    script_path = str(REPO_ROOT / "utils" / "validate_submission.py")
     cmd = [
         "python", script_path,
         "--matching", matching_path,
