@@ -2,8 +2,9 @@
 Ticket 0.1 — Data stats script
 
 Run with:
-    python -m src.common.dataset_stats --train-dir data/dataset/train --test-dir data/dataset/test
-    # (or simply `python -m src.common.dataset_stats` using defaults)
+    python -m src.common.dataset_stats
+    # (paths are resolved automatically via src/common/paths.py)
+    # Or override: --train-dir /custom/path/train --test-dir /custom/path/test
 
 Prints:
   - Row counts and country distributions for S1, S2, S3
@@ -22,6 +23,8 @@ from pathlib import Path
 from collections import Counter
 
 import pandas as pd
+
+from src.common.paths import TRAIN_DIR, TEST_DIR
 
 
 def _sep() -> None:
@@ -295,11 +298,10 @@ def main(train_dir: Path, test_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    default_train = "data/dataset/train" if Path("data/dataset/train").exists() else "dataset/train"
-    default_test = "data/dataset/test" if Path("data/dataset/test").exists() else "dataset/test"
-
     parser = argparse.ArgumentParser(description="Ticket 0.1 — Dataset EDA and stats")
-    parser.add_argument("--train-dir", default=default_train, type=Path)
-    parser.add_argument("--test-dir",  default=default_test,  type=Path)
+    parser.add_argument("--train-dir", default=TRAIN_DIR, type=Path,
+                        help=f"Path to train folder (default: {TRAIN_DIR})")
+    parser.add_argument("--test-dir",  default=TEST_DIR,  type=Path,
+                        help=f"Path to test folder  (default: {TEST_DIR})")
     args = parser.parse_args()
     main(args.train_dir, args.test_dir)

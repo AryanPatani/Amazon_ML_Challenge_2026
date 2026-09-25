@@ -42,6 +42,40 @@ cross-check is the biggest memory user, and the matching file is the only one sc
 import argparse
 import os
 import sys
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Repo-root resolution (same pattern as src/common/paths.py)
+# This file is at <repo_root>/utils/validate_submission.py
+# parents[0] = utils/, parents[1] = <repo_root>
+# ---------------------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_test_dir() -> Path:
+    env_dir = os.environ.get("AMAZON_ML_DATA_DIR") or os.environ.get("DATA_DIR")
+    if env_dir:
+        p = Path(env_dir).resolve()
+        if (p / "test").exists():
+            return p / "test"
+        if p.name == "test" and p.exists():
+            return p
+
+    candidates = [
+        _REPO_ROOT / "data" / "dataset" / "test",
+        _REPO_ROOT / "dataset" / "test",
+        _REPO_ROOT / "data" / "test",
+        _REPO_ROOT.parent / "dataset" / "test",
+        _REPO_ROOT.parent / "data" / "dataset" / "test",
+        _REPO_ROOT.parent / "data" / "test",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return _REPO_ROOT / "data" / "dataset" / "test"
+
+
+_TEST_DIR = _resolve_test_dir()
 
 DELIM = "\t"
 MAX_EXAMPLES = 5  # how many offending IDs to show per issue
@@ -289,12 +323,11 @@ def main():
         help="Path to candidate_pairs.tsv "
         "(default: output/candidate_pairs.tsv if it exists).",
     )
-    default_test_dir = "data/dataset/test" if os.path.exists("data/dataset/test") else "dataset/test"
     parser.add_argument(
         "--test-dir",
         "-t",
-        default=default_test_dir,
-        help="Folder with test_source1/2/3.tsv (default: %(default)s). "
+        default=_TEST_DIR,
+        help=f"Folder with test_source1/2/3.tsv (default: {_TEST_DIR}). "
         "test_source2/3.tsv are only read when --check-ids is given.",
     )
     parser.add_argument(

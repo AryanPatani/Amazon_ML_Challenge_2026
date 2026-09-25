@@ -4,7 +4,8 @@ eval/f05.py  — Ticket 0.2
 Macro-averaged F0.5 metric for the Amazon ML Challenge 2026 Entity Resolution task.
 
 Usage (CLI):
-    python -m eval.f05 evaluate --pred predictions.tsv --gt data/dataset/train/train_ground_truth.tsv
+    python -m eval.f05 evaluate --pred output/matching_results.tsv
+    # --gt defaults to data/dataset/train/train_ground_truth.tsv via src.common.paths
 
 Usage (Python):
     from eval.f05 import macro_f05, compute_f05
@@ -27,6 +28,8 @@ from pathlib import Path
 from typing import Union
 
 import pandas as pd
+
+from src.common.paths import GROUND_TRUTH_FILE, TRAIN_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -408,25 +411,13 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="cmd")
 
-    default_gt = (
-        Path("data/dataset/train/train_ground_truth.tsv")
-        if Path("data/dataset/train/train_ground_truth.tsv").exists()
-        else (
-            Path("dataset/train/train_ground_truth.tsv")
-            if Path("dataset/train/train_ground_truth.tsv").exists()
-            else Path("data/dataset/train/train_labels.tsv")
-        )
-    )
-    default_s1 = (
-        Path("data/dataset/train/train_source1.tsv")
-        if Path("data/dataset/train/train_source1.tsv").exists()
-        else Path("dataset/train/train_source1.tsv")
-    )
+    default_gt = GROUND_TRUTH_FILE
+    default_s1 = TRAIN_DIR / "train_source1.tsv"
 
     # evaluate command
     ev = sub.add_parser("evaluate", help="Evaluate a prediction TSV against ground truth")
     ev.add_argument("--pred", required=True, type=Path, help="Prediction TSV path")
-    ev.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV path (default: {default_gt})")
+    ev.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV (default: {default_gt})")
 
     # test command
     sub.add_parser("test", help="Run built-in self-tests")
@@ -434,7 +425,7 @@ def main() -> None:
     # val-split command
     vs = sub.add_parser("val-split", help="Create stratified train/val split")
     vs.add_argument("--s1",   default=default_s1, type=Path, help=f"train_source1.tsv path (default: {default_s1})")
-    vs.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV path (default: {default_gt})")
+    vs.add_argument("--gt",   default=default_gt, type=Path, help=f"Ground truth TSV (default: {default_gt})")
     vs.add_argument("--frac", default=0.2, type=float, help="Val fraction (default 0.2)")
 
     args = parser.parse_args()

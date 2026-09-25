@@ -7,11 +7,12 @@ All TSV files are read with explicit sep='\\t' as required by the problem spec.
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from src.common.paths import TRAIN_DIR, TEST_DIR, GROUND_TRUTH_FILE
 
 
 # ---------------------------------------------------------------------------
@@ -91,22 +92,22 @@ def load_all_sources(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Convenience loader for the full training set.
 
+    Defaults to the canonical TRAIN_DIR from src.common.paths (resolved via
+    __file__, so it works on every teammate's machine without config).
+
     Returns
     -------
     (source1, source2, source3, ground_truth)
     """
-    if train_dir is None:
-        train_dir = Path("data/dataset/train") if Path("data/dataset/train").exists() else Path("dataset/train")
-    else:
-        train_dir = Path(train_dir)
+    td = Path(train_dir) if train_dir is not None else TRAIN_DIR
 
-    s1 = load_source(train_dir / "train_source1.tsv", expected_prefix="S1-")
-    s2 = load_source(train_dir / "train_source2.tsv", expected_prefix="S2-")
-    s3 = load_source(train_dir / "train_source3.tsv", expected_prefix="S3-")
+    s1 = load_source(td / "train_source1.tsv", expected_prefix="S1-")
+    s2 = load_source(td / "train_source2.tsv", expected_prefix="S2-")
+    s3 = load_source(td / "train_source3.tsv", expected_prefix="S3-")
 
-    gt_file = train_dir / "train_ground_truth.tsv"
+    gt_file = td / "train_ground_truth.tsv"
     if not gt_file.exists():
-        gt_file = train_dir / "train_labels.tsv"
+        gt_file = td / "train_labels.tsv"
     gt = load_ground_truth(gt_file)
     return s1, s2, s3, gt
 
@@ -116,16 +117,15 @@ def load_test_sources(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Convenience loader for the test set (no labels available).
 
+    Defaults to the canonical TEST_DIR from src.common.paths.
+
     Returns
     -------
     (source1, source2, source3)
     """
-    if test_dir is None:
-        test_dir = Path("data/dataset/test") if Path("data/dataset/test").exists() else Path("dataset/test")
-    else:
-        test_dir = Path(test_dir)
+    td = Path(test_dir) if test_dir is not None else TEST_DIR
 
-    s1 = load_source(test_dir / "test_source1.tsv", expected_prefix="S1-")
-    s2 = load_source(test_dir / "test_source2.tsv", expected_prefix="S2-")
-    s3 = load_source(test_dir / "test_source3.tsv", expected_prefix="S3-")
+    s1 = load_source(td / "test_source1.tsv", expected_prefix="S1-")
+    s2 = load_source(td / "test_source2.tsv", expected_prefix="S2-")
+    s3 = load_source(td / "test_source3.tsv", expected_prefix="S3-")
     return s1, s2, s3
