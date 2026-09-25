@@ -1,0 +1,218 @@
+EDA report for: train_dir=dataset/train, test_dir=dataset/test
+
+==========================================================================================
+BASIC STATS — train_source1 (S1)
+==========================================================================================
+Rows: 2,206,821
+Columns: ['entity_id', 'business_name', 'business_address', 'country']
+Rows whose entity_id does NOT start with 'S1-': 0
+Duplicate entity_id values: 0
+
+Country distribution:
+country
+US       1323633
+India     883188
+
+Empty 'business_name': 0 (0.00%)
+
+Empty 'business_address': 0 (0.00%)
+Rows with duplicate (business_name, business_address) within train_source1 (S1): 0
+
+'business_name' length — mean: 24.0, median: 24, min: 3, max: 105
+
+'business_address' length — mean: 52.1, median: 41, min: 11, max: 256
+
+==========================================================================================
+BASIC STATS — train_source2 (S2)
+==========================================================================================
+Rows: 5,034,616
+Columns: ['entity_id', 'business_name', 'business_address', 'country']
+Rows whose entity_id does NOT start with 'S2-': 0
+Duplicate entity_id values: 0
+
+Country distribution:
+country
+US       3016817
+India    2017799
+
+Empty 'business_name': 0 (0.00%)
+
+Empty 'business_address': 168,967 (3.36%)
+Rows with duplicate (business_name, business_address) within train_source2 (S2): 25,891
+
+'business_name' length — mean: 25.1, median: 25, min: 2, max: 104
+
+'business_address' length — mean: 46.2, median: 37, min: 0, max: 249
+
+==========================================================================================
+BASIC STATS — train_source3 (S3)
+==========================================================================================
+Rows: 5,285,603
+Columns: ['entity_id', 'business_name', 'business_address', 'country']
+Rows whose entity_id does NOT start with 'S3-': 0
+Duplicate entity_id values: 0
+
+Country distribution:
+country
+US       3170056
+India    2115547
+
+Empty 'business_name': 0 (0.00%)
+
+Empty 'business_address': 175,916 (3.33%)
+Rows with duplicate (business_name, business_address) within train_source3 (S3): 18,881
+
+'business_name' length — mean: 25.2, median: 25, min: 2, max: 123
+
+'business_address' length — mean: 46.7, median: 42, min: 0, max: 240
+
+==========================================================================================
+GROUND TRUTH STATS
+==========================================================================================
+Rows in ground truth: 2,206,821
+Distinct S1 IDs in ground truth: 2,206,821
+Distinct S1 IDs in train_source1.tsv: 2,206,821
+S1 entities in source1 but MISSING from ground truth: 0
+S1 entities in ground truth but NOT in source1 file (should be 0): 0
+Duplicate source1_entity_id rows in ground truth (should be 0): 0
+
+Singletons (S1 with 0 matches): 123,247 (5.58%)
+S1 with >=1 match: 2,083,574 (94.42%)
+Average matches per S1 (all): 3.461
+Average matches per S1 (non-singletons only): 3.666
+Max matches for a single S1 entity: 11
+
+Distribution of match-count (0,1,2,3,4,5+):
+0     123247
+1     119157
+2     375212
+3     530841
+4     484115
+5+    574249
+
+Total matched ID mentions: 7,638,365
+  from Source 2: 3,693,619 (48.4%)
+  from Source 3: 3,944,746 (51.6%)
+
+Matched S2 IDs not found in train_source2.tsv (should be 0): 0
+Matched S3 IDs not found in train_source3.tsv (should be 0): 0
+
+==========================================================================================
+KEY CHECK — does an S2/S3 record ever match MORE THAN ONE S1 entity?
+==========================================================================================
+S2/S3 records matched to >1 distinct S1 entity: 0 out of 7638365 matched records (0.000%)
+
+=> Every matched S2/S3 record belongs to exactly one S1 entity in this data. This CONFIRMS the one-to-one assignment constraint — safe to enforce in Path A5.
+
+==========================================================================================
+COUNTRY CONSISTENCY CHECK (matched pairs)
+==========================================================================================
+Matched pairs with SAME country label: 7,638,365 (100.00%)
+Matched pairs with DIFFERENT country label: 0 (0.00%)
+
+=> Country always matches within a pair in this sample — safe to use as a hard blocking filter for US/India. Still avoid one-hot encoding it (France will be unseen).
+
+==========================================================================================
+SOURCE-2 vs SOURCE-3 CO-OCCURRENCE (same S1 matched to both?)
+==========================================================================================
+S1 entities matched to records in BOTH S2 and S3: 1,776,047 (85.24% of non-singletons)
+S1 entities matched ONLY to S2: 143,029 (6.86%)
+S1 entities matched ONLY to S3: 164,498 (7.89%)
+
+==========================================================================================
+SAMPLE MATCHED GROUPS (n=8) — read these to see real noise patterns
+==========================================================================================
+
+--- S1-965667 (US) ---
+  NAME:    Maure Williams Colombier Inc
+  ADDRESS: 85 Wayne Avenue, Ticonderoga, NY
+    MATCH S2-681193310: Maure Wilblims Colombier Inc | 
+    MATCH S2-743505751: Maure Williams Colombier | 
+    MATCH S3-775321672: Dréxkor | 85 Wanye Avenue, Ticonderoga Townshiip, New York
+    MATCH S3-11291185: maurewilliamscolombier.com | Wayne Ave, Ticonderoga Townshiip, New York
+    MATCH S3-860443364: Maure Williams Inc Center | 
+
+--- S1-603534325 (US) ---
+  NAME:    Standard Automation Consultants Inc
+  ADDRESS: 1671 442, Sweetwater, TX
+    MATCH S2-156627153: standard automation consultants inc | 671 442, SWEETWATER, TX
+    MATCH S2-646221399: Standard Automation | 671 442, SWEETWATER, TX
+    MATCH S3-630892257: Standard Automation Consultants Inc | 1671 442, PMB 4794, Sweetwater, Texas
+    MATCH S3-138964602: Standard Automation Consultants | 1671 442, PO Box 3953, Sweetwater, Texas
+
+--- S1-220637246 (India) ---
+  NAME:    Modern Infra Private Limited
+  ADDRESS: Kolkata, Calcutta, 31 B B D Bagh S, West Bengal
+    MATCH S2-512438681: Modern Infra Private Ltd | #31 B B D BAGH S, KOLKATA, West Bengal
+    MATCH S3-242933160: Modern Private Infra Limited | 31 B B D Bagh S, Calcutta, WB, Kolkata
+
+--- S1-826868606 (India) ---
+  NAME:    Shakti Care
+  ADDRESS: 77, 1St Floor, Nrupatunga Main Road, Mysore, Karnataka
+    MATCH S2-907074903: ಶಕ್ತಿ ಕೇರ್ | 77, MYSORE, Karnataka
+    MATCH S2-339629689: shakti care | 77, 1ST FLOOR, NRUPATUNGA MAIN ROAD, MYSORE, Karnataka
+    MATCH S3-536452010: ಶಕ್ತಿ ಕೇರ್ | 77, Mysore, KA
+    MATCH S3-71454071: shakticare.com | 77, 1St Floor, Nrupatunga Main Road, Mysore, ಕರ್ನಾಟಕ
+    MATCH S3-83937780: ಶಕ್ತಿ ಕೇರ್ | 77, 1St Floor, Nrupatunga Main Road, Mysore, ಕರ್ನಾಟಕ
+
+--- S1-962649864 (US) ---
+  NAME:    Asset Building Initiative LLC
+  ADDRESS: 282 Patton Lane, Mount Washington, KY
+    MATCH S2-834260452: Asset Building Initiative L.L.C. | 282 Patton Lane, MT WASHINGTON, KY
+    MATCH S2-448046259: ASSET BUILDING BUILDING INITIATIVE LLC | PATTON LN, MOUNT WASHINGTON, KY
+    MATCH S3-986965392: Asset Búilding Initiative LLC | 282 Patton Lane, Mount Washington, Kentucky
+    MATCH S3-359025623: Asset  Building Initiative LLC | 282 Patton Lane, Mount Washington, Kentucky
+
+--- S1-258693720 (US) ---
+  NAME:    Moats Industries Inc
+  ADDRESS: Merced, CA, 1351 Paseo Redondo Drive
+    MATCH S2-767268980: Moats  Industries Inc | 1351 PASEO REDONDO DRIVE, MERCED, CA
+    MATCH S3-819878363: Moats Industries | Paseo Redondo Dr, Merrced CITY, California
+    MATCH S3-21680472: Moats Industries | 
+    MATCH S3-883497404: Moats índustries Inc | 1351 Paseo Redondo Dr, Merrced CITY, California
+
+--- S1-793862016 (US) ---
+  NAME:    Advanced Consumer Associates LLC
+  ADDRESS: TN, 2258 Henrietta Road, Memphis
+    MATCH S2-808602716: ADVANCED CONSUMER ASSOCIATES L.L.C. | 2258 HENRIETTA RD, MEMPHIS TOWNSHIP, TN
+    MATCH S3-897234870: Advanced Consumer Associates | Henrietta Rd, Memphis, Tennessee
+    MATCH S3-527346800: Advanced-Consumer Assegatse LLC | 2258 Henrietta Rd, Memphis, Tennessee
+
+--- S1-36838589 (India) ---
+  NAME:    Rajdhani (p) Pvt Ltd
+  ADDRESS: 10A, Kasturba Gandhi Marg, New Delhi, Delhi
+    MATCH S2-393506422: Rajdhani-(p) Pvt | 10A, KASTURBA GANDHI MARG, Delhi
+    MATCH S2-6809275: RAJDHANI (P) LTD PVT | 10A, KASTURBA GANDHI MARG, दिल्ली
+    MATCH S2-32593386: Rajdhani (p) Pvt Limited | 10A, KASTURBA GANDHI MARG, दिल्ली
+    MATCH S2-164668372: Rjadahni (p) Pvt Ltd | 10A, KASTURBA GANDHI MARG, NEW DELHI, दिल्ली
+    MATCH S2-546228245: Rfjdhani (p) Pvt Ltd | KASTURBA GANDHI MARG, दिल्ली, 10A, NEW DELHI
+    MATCH S3-858791520: Rsdshain (p) Pvt Ltd | 10A, New Delhi, दिल्ली
+
+==========================================================================================
+TEST SET OVERVIEW
+==========================================================================================
+test_source1: 1,732,544 rows
+country
+India     809986
+US        663106
+France    259452
+
+test_source2: 4,887,273 rows
+country
+India     2312565
+US        1871330
+France     703378
+
+test_source3: 5,082,316 rows
+country
+India     2405000
+US        1945701
+France     731615
+
+Distinct countries in test_source1: ['France', 'India', 'US']
+(Compare this against train countries printed earlier — expect an extra unseen country, e.g. France.)
+
+==========================================================================================
+DONE
+==========================================================================================
+Full report saved to: eda_report.txt
