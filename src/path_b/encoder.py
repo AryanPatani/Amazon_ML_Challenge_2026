@@ -63,7 +63,13 @@ class DenseEncoder:
         except Exception as e:
             # If network error, attempt local cached loading
             print(f"[DenseEncoder] Online fetch failed ({e}). Retrying with local_files_only=True...")
-            self.model = SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
+            try:
+                self.model = SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
+            except Exception as e2:
+                fallback_model = "sentence-transformers/all-MiniLM-L6-v2"
+                print(f"[DenseEncoder] Local load of '{self.model_name}' failed ({e2}). Falling back to cached '{fallback_model}'...")
+                self.model_name = fallback_model
+                self.model = SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
 
         self.model.max_seq_length = self.max_seq_length
 

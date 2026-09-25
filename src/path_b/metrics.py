@@ -63,10 +63,8 @@ def compute_recall_at_k(
     macro_recalls = {k: [] for k in k_list}
     all_hits = {k: 0 for k in k_list}
 
-    for s1_id, true_matches in ground_truth.items():
-        if s1_id not in clean_retrieved:
-            continue
-
+    for s1_id, cands in clean_retrieved.items():
+        true_matches = ground_truth.get(s1_id, [])
         true_set = set(true_matches)
         n_true = len(true_set)
 
@@ -76,8 +74,6 @@ def compute_recall_at_k(
 
         non_singleton_count += 1
         total_true_matches += n_true
-
-        cands = clean_retrieved[s1_id]
 
         for k in k_list:
             top_k_set = set(cands[:k])

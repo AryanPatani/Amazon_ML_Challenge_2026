@@ -274,3 +274,23 @@ class VectorRetriever:
         df = pd.DataFrame(rows)
         df.to_csv(out_file, sep="\t", index=False)
         print(f"[VectorRetriever] Exported {len(df):,} candidate pairs to {out_file}")
+
+    @staticmethod
+    def load_candidate_pairs_tsv(
+        input_path: Union[str, Path],
+    ) -> dict[str, list[str]]:
+        """Load candidate pairs from official candidate_pairs.tsv format.
+
+        Format:
+            source1_entity_id \\t candidate_entity_ids
+        where candidate_entity_ids is comma-separated IDs.
+        """
+        df = pd.read_csv(input_path, sep="\t", dtype=str, keep_default_na=False)
+        col_s1 = "source1_entity_id" if "source1_entity_id" in df.columns else df.columns[0]
+        col_cands = "candidate_entity_ids" if "candidate_entity_ids" in df.columns else df.columns[1]
+        out: dict[str, list[str]] = {}
+        for s1_id, cell in zip(df[col_s1], df[col_cands]):
+            cell = str(cell).strip()
+            out[str(s1_id)] = [x.strip() for x in cell.split(",") if x.strip()] if cell else []
+        return out
+
