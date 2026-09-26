@@ -285,11 +285,24 @@ def find_optimal_threshold(
 
 def format_scored_pairs_dataframe(
     scored_candidates: dict[str, list[tuple[str, float]]],
+    bi_encoder_candidates: Optional[dict[str, list[Union[str, tuple[str, float]]]]] = None,
+    ground_truth: Optional[dict[str, list[str]]] = None,
+    extra_features: bool = False,
 ) -> pd.DataFrame:
     """Convert candidate score dictionary to standard DataFrame.
 
-    Columns: s1_id, cand_id, score
+    If bi_encoder_candidates is provided or extra_features is True, extra neural features
+    (bi_encoder_score, retrieval_rank, margins, etc.) are included for Path A.
+    Otherwise, returns the canonical 3-column DataFrame: [s1_id, cand_id, score].
     """
+    if extra_features or bi_encoder_candidates is not None or ground_truth is not None:
+        from src.path_b.feature_export import build_path_b_feature_dataframe
+        return build_path_b_feature_dataframe(
+            cross_scored_candidates=scored_candidates,
+            bi_encoder_candidates=bi_encoder_candidates,
+            ground_truth=ground_truth,
+        )
+
     rows = []
     for s1_id, cands in scored_candidates.items():
         for cand_id, score in cands:
@@ -304,6 +317,9 @@ def format_scored_pairs_dataframe(
 def export_scores_parquet(
     scored_candidates: dict[str, list[tuple[str, float]]],
     output_path: Union[str, Path] = SCORES_DIR / "path_b_val.parquet",
+    bi_encoder_candidates: Optional[dict[str, list[Union[str, tuple[str, float]]]]] = None,
+    ground_truth: Optional[dict[str, list[str]]] = None,
+    extra_features: bool = False,
 ) -> Path:
     """Save scored pairs to parquet according to the shared team contract.
 
@@ -311,11 +327,18 @@ def export_scores_parquet(
         s1_id: string
         cand_id: string
         score: float in [0.0, 1.0]
+        plus optional extra features for Path A ensemble when bi_encoder_candidates is given
+        or extra_features=True.
     """
     out_file = Path(output_path)
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
-    df = format_scored_pairs_dataframe(scored_candidates)
+    df = format_scored_pairs_dataframe(
+        scored_candidates=scored_candidates,
+        bi_encoder_candidates=bi_encoder_candidates,
+        ground_truth=ground_truth,
+        extra_features=extra_features,
+    )
     df.to_parquet(out_file, index=False)
     print(f"[Export] Saved {len(df):,} scored candidate pairs to {out_file}")
     return out_file

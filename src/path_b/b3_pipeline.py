@@ -283,7 +283,12 @@ def run_b3_pipeline(
 
     # Export outputs according to shared contract
     print("\n--- EXPORTING ARTIFACTS ACCORDING TO SHARED CONTRACT ---")
-    parquet_out = export_scores_parquet(val_scored_candidates, scores_parquet_path)
+    parquet_out = export_scores_parquet(
+        scored_candidates=val_scored_candidates,
+        output_path=scores_parquet_path,
+        bi_encoder_candidates=val_candidates,
+        ground_truth=gt_map,
+    )
     tsv_out = export_matching_results_tsv(best_preds, results_tsv_path)
     VectorRetriever.export_candidate_pairs_tsv(val_candidates, candidates_tsv_path)
     print(f"[Export] Saved candidate pairs TSV to {candidates_tsv_path}")
