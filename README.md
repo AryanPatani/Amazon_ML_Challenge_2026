@@ -1,4 +1,4 @@
-# Amazon ML Challenge 2026 — Business Entity Resolution
+# Amazon ML Challenge 2026 - Business Entity Resolution
 
 This repository implements the end-to-end entity resolution pipeline for the Amazon ML Challenge 2026.
 
