@@ -266,6 +266,15 @@ def fine_tune_cross_encoder(
     print(f"\n[CrossTrainer] Initializing base cross-encoder '{base_model_name}' on '{target_device}'...")
     from sentence_transformers import CrossEncoder
 
+    # Fix for multi-GPU environments (e.g. Kaggle 2x T4):
+    # Sentence-transformers CrossEncoder losses access self.model.preprocess and self.model.device.
+    # When PyTorch wraps the model in DataParallel, these attributes must be forwarded to the underlying module.
+    import torch.nn as nn
+    if not hasattr(nn.DataParallel, "preprocess"):
+        nn.DataParallel.preprocess = lambda self, *args, **kwargs: self.module.preprocess(*args, **kwargs)
+    if not hasattr(nn.DataParallel, "device"):
+        nn.DataParallel.device = property(lambda self: self.module.device)
+
     def _load_model(dev: str) -> CrossEncoder:
         try:
             return CrossEncoder(base_model_name, num_labels=1, device=dev, local_files_only=True)
