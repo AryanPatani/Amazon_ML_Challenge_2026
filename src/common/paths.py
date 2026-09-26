@@ -69,6 +69,13 @@ def _resolve_data_dir() -> Path:
         if (candidate / "train").exists():
             return candidate
 
+    # Check common Kaggle / Colab input directories
+    kaggle_input = Path("/kaggle/input")
+    if kaggle_input.exists():
+        for p in kaggle_input.rglob("train"):
+            if p.is_dir() and (p / "train_source1.tsv").exists():
+                return p.parent
+
     # Fallback to default expected path
     return REPO_ROOT / "data" / "dataset"
 
