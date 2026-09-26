@@ -71,6 +71,11 @@ def run_b3_pipeline(
     scores_parquet_path: str = str(SCORES_DIR / "path_b_val.parquet"),
     results_tsv_path: str = str(OUTPUT_DIR / "matching_results_path_b.tsv"),
     candidates_tsv_path: str = str(OUTPUT_DIR / "candidate_pairs_path_b.tsv"),
+    # B4 Augmentation
+    augment_positives: bool = False,
+    n_augments: int = 2,
+    aug_min_ops: int = 1,
+    aug_max_ops: int = 3,
 ) -> dict:
     """Execute end-to-end Cross-Encoder re-ranking and evaluation."""
     start_time = time.time()
@@ -87,6 +92,7 @@ def run_b3_pipeline(
     print(f"Negatives per Pos:     {max_negs_per_pos}")
     print(f"1-to-1 Constraint:     {enforce_one_to_one}")
     print(f"Candidates Source:     {candidates_file or 'Dense Retrieval (on-the-fly)'}")
+    print(f"Augment Positives:     {augment_positives}" + (f" (x{n_augments}, ops={aug_min_ops}-{aug_max_ops})" if augment_positives else ""))
     print(f"Seed:                  {seed}")
     print(f"Sample Size:           {'FULL DATASET' if sample_size is None else f'{sample_size:,}'}")
     print("-" * 70)
@@ -229,6 +235,11 @@ def run_b3_pipeline(
         max_negatives_per_positive=max_negs_per_pos,
         corpus_ids=corpus_ids,
         random_seed=seed,
+        augment_positives=augment_positives,
+        n_augments=n_augments,
+        aug_min_ops=aug_min_ops,
+        aug_max_ops=aug_max_ops,
+        aug_seed=seed + 57,
     )
 
     # 6. Fine-tune Cross-Encoder
@@ -327,6 +338,10 @@ def main() -> None:
     parser.add_argument("--candidates-file", type=str, default=None, help="Path to precomputed candidate pairs TSV")
     parser.add_argument("--no-1to1", action="store_true", help="Disable 1-to-1 global assignment constraint")
     parser.add_argument("--no-canonicalize", action="store_true", help="Disable canonical text normalization")
+    parser.add_argument("--augment", action="store_true", help="(B4) Enable synthetic noise augmentation on positive pairs")
+    parser.add_argument("--n-augments", type=int, default=2, help="(B4) Number of noisy copies per positive pair (default: 2)")
+    parser.add_argument("--aug-min-ops", type=int, default=1, help="(B4) Min augmentation operations per copy (default: 1)")
+    parser.add_argument("--aug-max-ops", type=int, default=3, help="(B4) Max augmentation operations per copy (default: 3)")
     parser.add_argument("--device", type=str, default=None, help="Device ('cpu', 'mps', 'cuda')")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
     args = parser.parse_args()
@@ -347,6 +362,10 @@ def main() -> None:
         candidates_file=args.candidates_file,
         enforce_one_to_one=not args.no_1to1,
         canonicalize=not args.no_canonicalize,
+        augment_positives=args.augment,
+        n_augments=args.n_augments,
+        aug_min_ops=args.aug_min_ops,
+        aug_max_ops=args.aug_max_ops,
         device=args.device,
         seed=args.seed,
     )

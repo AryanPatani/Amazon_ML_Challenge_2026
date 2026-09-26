@@ -1,17 +1,24 @@
 """
 src/path_b/cross_dataset.py
 
-Ticket B3: Pair dataset preparation for Cross-Encoder re-ranking.
+Ticket B3/B4: Pair dataset preparation for Cross-Encoder re-ranking.
 Extracts labeled (anchor, candidate) pairs from retrieval candidate pools,
 balancing true matches (label=1.0) and retrieved hard negative confusers (label=0.0).
+
+Ticket B4 adds synthetic noise augmentation: each positive pair is replicated
+N times with probabilistically corrupted anchor/candidate text (drop PIN,
+swap word order, abbreviate, transliterate accents, drop suffix, etc.) to
+simulate unseen-country noise and improve model generalisation.
 """
 
 from __future__ import annotations
 
+import random
 from typing import Optional, Union
 import numpy as np
 
 from src.path_b.hard_negatives import InputExample
+from src.path_b.augmentation import corrupt_text
 
 
 def prepare_cross_encoder_examples(
@@ -26,6 +33,12 @@ def prepare_cross_encoder_examples(
     include_fallback_negatives: bool = True,
     corpus_ids: Optional[list[str]] = None,
     random_seed: int = 42,
+    # B4 Augmentation parameters
+    augment_positives: bool = False,
+    n_augments: int = 2,
+    aug_min_ops: int = 1,
+    aug_max_ops: int = 3,
+    aug_seed: int = 99,
 ) -> list[InputExample]:
     """Build labeled (S1, candidate) pairs for cross-encoder training.
 
@@ -53,6 +66,22 @@ def prepare_cross_encoder_examples(
         Pool of corpus IDs for random fallback negatives.
     random_seed : int, optional
         Random seed for deterministic negative sampling, by default 42.
+    augment_positives : bool, optional
+        (B4) If True, generate *n_augments* noisy variants of every positive pair.
+        Corrupted anchor / corrupted candidate pairs expose the cross-encoder to
+        unseen-country surface-level noise (PIN drop, word-order swap, French
+        accent transliteration, abbreviations, etc.).
+        By default False.
+    n_augments : int, optional
+        Number of noisy copies per positive pair when augment_positives=True.
+        By default 2.
+    aug_min_ops : int, optional
+        Minimum number of augmentation operations applied per copy, by default 1.
+    aug_max_ops : int, optional
+        Maximum number of augmentation operations applied per copy, by default 3.
+    aug_seed : int, optional
+        Seed for the augmentation RNG (separate from negative-sampling seed).
+        By default 99.
 
     Returns
     -------
@@ -62,9 +91,13 @@ def prepare_cross_encoder_examples(
     examples: list[InputExample] = []
     num_pos = 0
     num_neg = 0
+    num_aug = 0
 
     rng = np.random.default_rng(random_seed)
     fallback_pool = corpus_ids or list(corpus_texts.keys())
+
+    # B4: augmentation RNG (separate from negative sampling RNG for reproducibility)
+    aug_rng = random.Random(aug_seed) if augment_positives else None
 
     # Clean candidates to string IDs
     clean_candidates: dict[str, list[str]] = {}
@@ -94,6 +127,26 @@ def prepare_cross_encoder_examples(
                 num_pos += 1
                 pos_added_for_anchor += 1
                 pos_texts_for_anchor.add(pos_text)
+
+                # B4: augmented positive copies (corrupted anchor + corrupted candidate)
+                if augment_positives and aug_rng is not None:
+                    for _ in range(n_augments):
+                        # Independently corrupt each side to maximise coverage
+                        aug_anchor = corrupt_text(
+                            anchor_text, rng=aug_rng,
+                            min_augmentations=aug_min_ops,
+                            max_augmentations=aug_max_ops,
+                        )
+                        aug_cand = corrupt_text(
+                            pos_text, rng=aug_rng,
+                            min_augmentations=aug_min_ops,
+                            max_augmentations=aug_max_ops,
+                        )
+                        # Skip if augmentation produced an identical pair
+                        if aug_anchor == anchor_text and aug_cand == pos_text:
+                            continue
+                        examples.append(InputExample(texts=[aug_anchor, aug_cand], label=1.0))
+                        num_aug += 1
 
         # 2. Hard Negative Pairs
         hard_negs = [c for c in cands if c not in true_set]
@@ -130,8 +183,9 @@ def prepare_cross_encoder_examples(
             examples.append(InputExample(texts=[anchor_text, neg_text], label=0.0))
             num_neg += 1
 
+    aug_msg = f" + {num_aug:,} augmented positives (B4)" if augment_positives else ""
     print(f"[CrossDataset] Generated {len(examples):,} cross-encoder training pairs: "
-          f"{num_pos:,} positives (1.0) + {num_neg:,} negatives (0.0).")
+          f"{num_pos:,} positives (1.0) + {num_neg:,} negatives (0.0){aug_msg}.")
     return examples
 
 
