@@ -4,21 +4,22 @@ tags:
 - cross-encoder
 - reranker
 - generated_from_trainer
-- dataset_size:339
+- dataset_size:53096
 - loss:BinaryCrossEntropyLoss
+base_model: sentence-transformers/all-MiniLM-L6-v2
 pipeline_tag: text-ranking
 library_name: sentence-transformers
 ---
 
-# CrossEncoder
+# CrossEncoder based on sentence-transformers/all-MiniLM-L6-v2
 
-This is a [Cross Encoder](https://www.sbert.net/docs/cross_encoder/usage/usage.html) model trained using the [sentence-transformers](https://www.SBERT.net) library. It computes scores for pairs of texts, which can be used for text reranking and semantic search.
+This is a [Cross Encoder](https://www.sbert.net/docs/cross_encoder/usage/usage.html) model finetuned from [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) using the [sentence-transformers](https://www.SBERT.net) library. It computes scores for pairs of texts, which can be used for text reranking and semantic search.
 
 ## Model Details
 
 ### Model Description
 - **Model Type:** Cross Encoder
-<!-- - **Base model:** [Unknown](https://huggingface.co/unknown) -->
+- **Base model:** [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) <!-- at revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41 -->
 - **Maximum Sequence Length:** 512 tokens
 - **Number of Output Labels:** 1 label
 - **Supported Modality:** Text
@@ -59,25 +60,25 @@ from sentence_transformers import CrossEncoder
 model = CrossEncoder("cross_encoder_model_id")
 # Get scores for pairs of inputs
 pairs = [
-    ['helios | 66 edgewood street bridgeport court', 'ग्रीन लॉजिस्टिक्स प्राइवेट लिमिटेड | e 7 second floor new delhi south दिल्ली'],
-    ['christ chapel | 2100 cameron drive unit apartment g dundalk maryland', 'unified choice center | 2701 a eastern boulevard unit building 3030 middle river maryland'],
-    ['helios | 66 edgewood street bridgeport court', 'heli0s lp | 66 edgewood street bridgeport court'],
-    ['moore bitwise incorporated | 337 oakland avenue michigan city indiana', 'moore bitwise incorporated | 337 oakland avenue michhigan city indiana'],
-    ['health fellowship partners | 601 oleander circle virginia beach city', 'health fellowship parrts | 601 oleander cir virginia beach'],
+    ['damiex purpose | oklahoma 209 moore avenue colbert', 'odette s digital'],
+    ['modern consulting private limited | plot no 116 b and p gut 152 near alok nagar satara parisar aurangabad maharashtra', 'modern कंसल्टिंग प्रा लि | plot no 116 b and p gut 152 near alok nagar satara parisar regional office aurangabad महाराष्ट्र'],
+    ['bores brancato and mcbrayer polestar | new york buffalo 331 breckenridge street', 'peggie n torres ph d llc | new york syracsue 311b oak saint'],
+    ['visionary and sons private limited | ground floor incor opulence gunjur palya road village varthur bangalore flat no g05 karnataka', 'ಸೂಪರ್ ಲಾಜಿಸ್ಟಿಕ್ಸ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್ | 29 bangalore karnataka old 6 prime rose road'],
+    ['upper dome | fl 1 14578 short road sesser illinois', 'upper best monte | 139 summerfield lane cashiers north carolina'],
 ]
 scores = model.predict(pairs)
 print(scores)
-# [0.3642 0.3608 0.3668 0.3658 0.3816]
+# [0.0037 0.9963 0.0033 0.0035 0.0034]
 
 # Or rank different texts based on similarity to a single text
 ranks = model.rank(
-    'helios | 66 edgewood street bridgeport court',
+    'damiex purpose | oklahoma 209 moore avenue colbert',
     [
-        'ग्रीन लॉजिस्टिक्स प्राइवेट लिमिटेड | e 7 second floor new delhi south दिल्ली',
-        'unified choice center | 2701 a eastern boulevard unit building 3030 middle river maryland',
-        'heli0s lp | 66 edgewood street bridgeport court',
-        'moore bitwise incorporated | 337 oakland avenue michhigan city indiana',
-        'health fellowship parrts | 601 oleander cir virginia beach',
+        'odette s digital',
+        'modern कंसल्टिंग प्रा लि | plot no 116 b and p gut 152 near alok nagar satara parisar regional office aurangabad महाराष्ट्र',
+        'peggie n torres ph d llc | new york syracsue 311b oak saint',
+        'ಸೂಪರ್ ಲಾಜಿಸ್ಟಿಕ್ಸ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್ | 29 bangalore karnataka old 6 prime rose road',
+        'upper best monte | 139 summerfield lane cashiers north carolina',
     ]
 )
 # [{'corpus_id': ..., 'score': ...}, {'corpus_id': ..., 'score': ...}, ...]
@@ -125,19 +126,19 @@ You can finetune this model on your own dataset.
 
 #### Unnamed Dataset
 
-* Size: 339 training samples
+* Size: 53,096 training samples
 * Columns: <code>sentence_0</code>, <code>sentence_1</code>, and <code>label</code>
-* Approximate statistics based on the first 339 samples:
-  |         | sentence_0                                                                         | sentence_1                                                                        | label                                                         |
-  |:--------|:-----------------------------------------------------------------------------------|:----------------------------------------------------------------------------------|:--------------------------------------------------------------|
-  | type    | string                                                                             | string                                                                            | float                                                         |
-  | details | <ul><li>min: 12 tokens</li><li>mean: 18.86 tokens</li><li>max: 35 tokens</li></ul> | <ul><li>min: 4 tokens</li><li>mean: 19.46 tokens</li><li>max: 43 tokens</li></ul> | <ul><li>min: 0.0</li><li>mean: 0.2</li><li>max: 1.0</li></ul> |
+* Approximate statistics based on the first 1000 samples:
+  |         | sentence_0                                                                         | sentence_1                                                                        | label                                                          |
+  |:--------|:-----------------------------------------------------------------------------------|:----------------------------------------------------------------------------------|:---------------------------------------------------------------|
+  | type    | string                                                                             | string                                                                            | float                                                          |
+  | details | <ul><li>min: 10 tokens</li><li>mean: 19.47 tokens</li><li>max: 48 tokens</li></ul> | <ul><li>min: 4 tokens</li><li>mean: 18.68 tokens</li><li>max: 61 tokens</li></ul> | <ul><li>min: 0.0</li><li>mean: 0.27</li><li>max: 1.0</li></ul> |
 * Samples:
-  | sentence_0                                                                         | sentence_1                                                                                              | label            |
-  |:-----------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------|:-----------------|
-  | <code>helios \| 66 edgewood street bridgeport court</code>                         | <code>ग्रीन लॉजिस्टिक्स प्राइवेट लिमिटेड \| e 7 second floor new delhi south दिल्ली</code>              | <code>0.0</code> |
-  | <code>christ chapel \| 2100 cameron drive unit apartment g dundalk maryland</code> | <code>unified choice center \| 2701 a eastern boulevard unit building 3030 middle river maryland</code> | <code>0.0</code> |
-  | <code>helios \| 66 edgewood street bridgeport court</code>                         | <code>heli0s lp \| 66 edgewood street bridgeport court</code>                                           | <code>1.0</code> |
+  | sentence_0                                                                                                                          | sentence_1                                                                                                                                | label            |
+  |:------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------|:-----------------|
+  | <code>damiex purpose \| oklahoma 209 moore avenue colbert</code>                                                                    | <code>odette s digital</code>                                                                                                             | <code>0.0</code> |
+  | <code>modern consulting private limited \| plot no 116 b and p gut 152 near alok nagar satara parisar aurangabad maharashtra</code> | <code>modern कंसल्टिंग प्रा लि \| plot no 116 b and p gut 152 near alok nagar satara parisar regional office aurangabad महाराष्ट्र</code> | <code>1.0</code> |
+  | <code>bores brancato and mcbrayer polestar \| new york buffalo 331 breckenridge street</code>                                       | <code>peggie n torres ph d llc \| new york syracsue 311b oak saint</code>                                                                 | <code>0.0</code> |
 * Loss: [<code>BinaryCrossEntropyLoss</code>](https://sbert.net/docs/package_reference/cross_encoder/losses.html#binarycrossentropyloss) with these parameters:
   ```json
   {
@@ -149,105 +150,104 @@ You can finetune this model on your own dataset.
 ### Training Hyperparameters
 #### Non-Default Hyperparameters
 
+- `per_device_train_batch_size`: 32
+- `per_device_eval_batch_size`: 32
 - `num_train_epochs`: 1
 
 #### All Hyperparameters
 <details><summary>Click to expand</summary>
 
-- `per_device_train_batch_size`: 8
-- `num_train_epochs`: 1
-- `max_steps`: -1
+- `do_predict`: False
+- `prediction_loss_only`: True
+- `per_device_train_batch_size`: 32
+- `per_device_eval_batch_size`: 32
+- `gradient_accumulation_steps`: 1
+- `eval_accumulation_steps`: None
+- `torch_empty_cache_steps`: None
 - `learning_rate`: 5e-05
-- `lr_scheduler_type`: linear
-- `lr_scheduler_kwargs`: None
-- `warmup_steps`: 0
-- `optim`: adamw_torch_fused
-- `optim_args`: None
 - `weight_decay`: 0.0
 - `adam_beta1`: 0.9
 - `adam_beta2`: 0.999
 - `adam_epsilon`: 1e-08
-- `optim_target_modules`: None
-- `gradient_accumulation_steps`: 1
-- `average_tokens_across_devices`: True
 - `max_grad_norm`: 1
-- `label_smoothing_factor`: 0.0
+- `num_train_epochs`: 1
+- `max_steps`: -1
+- `lr_scheduler_type`: linear
+- `lr_scheduler_kwargs`: None
+- `warmup_ratio`: None
+- `warmup_steps`: 0
+- `log_level`: passive
+- `log_level_replica`: warning
+- `log_on_each_node`: True
+- `logging_nan_inf_filter`: True
+- `enable_jit_checkpoint`: False
+- `save_on_each_node`: False
+- `save_only_model`: False
+- `restore_callback_states_from_checkpoint`: False
+- `use_cpu`: False
+- `seed`: 42
+- `data_seed`: None
 - `bf16`: False
 - `fp16`: False
 - `bf16_full_eval`: False
 - `fp16_full_eval`: False
 - `tf32`: None
-- `gradient_checkpointing`: False
-- `gradient_checkpointing_kwargs`: None
-- `torch_compile`: False
-- `torch_compile_backend`: None
-- `torch_compile_mode`: None
-- `use_liger_kernel`: False
-- `liger_kernel_config`: None
-- `use_cache`: False
-- `neftune_noise_alpha`: None
-- `torch_empty_cache_steps`: None
-- `auto_find_batch_size`: False
-- `log_on_each_node`: True
-- `logging_nan_inf_filter`: True
-- `include_num_input_tokens_seen`: no
-- `log_level`: passive
-- `log_level_replica`: warning
-- `disable_tqdm`: False
-- `project`: huggingface
-- `trackio_space_id`: None
-- `trackio_bucket_id`: None
-- `trackio_static_space_id`: None
-- `per_device_eval_batch_size`: 8
-- `prediction_loss_only`: True
-- `eval_on_start`: False
-- `eval_do_concat_batches`: True
-- `eval_use_gather_object`: False
-- `eval_accumulation_steps`: None
-- `include_for_metrics`: []
-- `batch_eval_metrics`: False
-- `save_only_model`: False
-- `save_on_each_node`: False
-- `enable_jit_checkpoint`: False
-- `push_to_hub`: False
-- `hub_private_repo`: None
-- `hub_model_id`: None
-- `hub_strategy`: every_save
-- `hub_always_push`: False
-- `hub_revision`: None
-- `load_best_model_at_end`: False
-- `ignore_data_skip`: False
-- `restore_callback_states_from_checkpoint`: False
-- `full_determinism`: False
-- `seed`: 42
-- `data_seed`: None
-- `use_cpu`: False
-- `accelerator_config`: {'split_batches': False, 'dispatch_batches': None, 'even_batches': True, 'use_seedable_sampler': True, 'non_blocking': False, 'gradient_accumulation_kwargs': None}
-- `parallelism_config`: None
+- `local_rank`: -1
+- `ddp_backend`: None
+- `debug`: []
 - `dataloader_drop_last`: False
 - `dataloader_num_workers`: 0
-- `dataloader_pin_memory`: True
-- `dataloader_persistent_workers`: False
 - `dataloader_prefetch_factor`: None
+- `disable_tqdm`: False
 - `remove_unused_columns`: True
 - `label_names`: None
-- `train_sampling_strategy`: random
+- `load_best_model_at_end`: False
+- `ignore_data_skip`: False
+- `fsdp`: []
+- `fsdp_config`: {'min_num_params': 0, 'xla': False, 'xla_fsdp_v2': False, 'xla_fsdp_grad_ckpt': False}
+- `accelerator_config`: {'split_batches': False, 'dispatch_batches': None, 'even_batches': True, 'use_seedable_sampler': True, 'non_blocking': False, 'gradient_accumulation_kwargs': None}
+- `parallelism_config`: None
+- `deepspeed`: None
+- `label_smoothing_factor`: 0.0
+- `optim`: adamw_torch_fused
+- `optim_args`: None
+- `group_by_length`: False
 - `length_column_name`: length
+- `project`: huggingface
+- `trackio_space_id`: trackio
 - `ddp_find_unused_parameters`: None
 - `ddp_bucket_cap_mb`: None
 - `ddp_broadcast_buffers`: False
-- `ddp_static_graph`: None
-- `ddp_backend`: None
-- `ddp_timeout`: 1800
-- `fsdp`: []
-- `fsdp_config`: {'min_num_params': 0, 'xla': False, 'xla_fsdp_v2': False, 'xla_fsdp_grad_ckpt': False}
-- `deepspeed`: None
-- `debug`: []
+- `dataloader_pin_memory`: True
+- `dataloader_persistent_workers`: False
 - `skip_memory_metrics`: True
-- `do_predict`: False
+- `push_to_hub`: False
 - `resume_from_checkpoint`: None
-- `warmup_ratio`: None
-- `local_rank`: -1
+- `hub_model_id`: None
+- `hub_strategy`: every_save
+- `hub_private_repo`: None
+- `hub_always_push`: False
+- `hub_revision`: None
+- `gradient_checkpointing`: False
+- `gradient_checkpointing_kwargs`: None
+- `include_for_metrics`: []
+- `eval_do_concat_batches`: True
+- `auto_find_batch_size`: False
+- `full_determinism`: False
+- `ddp_timeout`: 1800
+- `torch_compile`: False
+- `torch_compile_backend`: None
+- `torch_compile_mode`: None
+- `include_num_input_tokens_seen`: no
+- `neftune_noise_alpha`: None
+- `optim_target_modules`: None
+- `batch_eval_metrics`: False
+- `eval_on_start`: False
+- `use_liger_kernel`: False
+- `liger_kernel_config`: None
+- `eval_use_gather_object`: False
+- `average_tokens_across_devices`: True
+- `use_cache`: False
 - `prompts`: None
 - `batch_sampler`: batch_sampler
 - `multi_dataset_batch_sampler`: proportional
@@ -256,16 +256,24 @@ You can finetune this model on your own dataset.
 
 </details>
 
+### Training Logs
+| Epoch  | Step | Training Loss |
+|:------:|:----:|:-------------:|
+| 0.3012 | 500  | 0.2522        |
+| 0.6024 | 1000 | 0.0675        |
+| 0.9036 | 1500 | 0.0489        |
+
+
 ### Training Time
-- **Training**: 3.9 seconds
+- **Training**: 1.9 minutes
 
 ### Framework Versions
-- Python: 3.14.2
+- Python: 3.12.13
 - Sentence Transformers: 5.4.1
-- Transformers: 5.8.1
-- PyTorch: 2.9.1
-- Accelerate: 1.14.0
-- Datasets: 5.0.1
+- Transformers: 5.0.0
+- PyTorch: 2.10.0+cu128
+- Accelerate: 1.13.0
+- Datasets: 5.0.0
 - Tokenizers: 0.22.2
 
 ## Citation

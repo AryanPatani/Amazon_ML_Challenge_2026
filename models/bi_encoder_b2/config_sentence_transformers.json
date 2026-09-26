@@ -4,8 +4,11 @@
     "sentence_transformers": "5.4.1",
     "transformers": "5.0.0"
   },
-  "activation_fn": "torch.nn.modules.activation.Sigmoid",
   "default_prompt_name": null,
-  "model_type": "CrossEncoder",
-  "prompts": {}
+  "model_type": "SentenceTransformer",
+  "prompts": {
+    "document": "",
+    "query": ""
+  },
+  "similarity_fn_name": "cosine"
 }
