@@ -11,8 +11,9 @@ Generates a feature table for pairs. Features include:
 import sys
 import time
 import argparse
+import difflib
 from pathlib import Path
-from collections import defaultdict
+from typing import Any, Dict, List, Set
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -26,62 +27,79 @@ if str(REPO_ROOT) not in sys.path:
 from src.common.data_loader import load_all_sources
 from src.common.normalize import normalize_name, normalize_address
 
-# Safe import for rapidfuzz with pure-Python fallback
+# Safe optional import for rapidfuzz with pure-Python difflib fallback
 try:
-    from rapidfuzz import fuzz, distance
+    from rapidfuzz import fuzz, distance  # type: ignore[import-not-found, import-untyped]
     HAS_RAPIDFUZZ = True
 except ImportError:
+    fuzz = None
+    distance = None
     HAS_RAPIDFUZZ = False
-    import difflib
-
-    class _Distance:
-        class JaroWinkler:
-            @staticmethod
-            def normalized_similarity(s1, s2):
-                if not s1 and not s2:
-                    return 1.0
-                if not s1 or not s2:
-                    return 0.0
-                return difflib.SequenceMatcher(None, str(s1), str(s2)).ratio()
-
-        class Levenshtein:
-            @staticmethod
-            def normalized_similarity(s1, s2):
-                if not s1 and not s2:
-                    return 1.0
-                if not s1 or not s2:
-                    return 0.0
-                return difflib.SequenceMatcher(None, str(s1), str(s2)).ratio()
-
-    class _Fuzz:
-        @staticmethod
-        def token_set_ratio(s1, s2):
-            s1, s2 = str(s1), str(s2)
-            set1, set2 = set(s1.split()), set(s2.split())
-            if not set1 and not set2:
-                return 100.0
-            inter = ' '.join(sorted(set1 & set2))
-            diff1 = ' '.join(sorted(set1 - set2))
-            diff2 = ' '.join(sorted(set2 - set1))
-            s1_sort = (inter + ' ' + diff1).strip()
-            s2_sort = (inter + ' ' + diff2).strip()
-            candidates = [difflib.SequenceMatcher(None, s1_sort, s2_sort).ratio()]
-            if inter:
-                candidates.append(difflib.SequenceMatcher(None, inter, s1_sort).ratio())
-                candidates.append(difflib.SequenceMatcher(None, inter, s2_sort).ratio())
-            return max(candidates) * 100.0
-
-        @staticmethod
-        def token_sort_ratio(s1, s2):
-            t1 = ' '.join(sorted(str(s1).split()))
-            t2 = ' '.join(sorted(str(s2).split()))
-            return difflib.SequenceMatcher(None, t1, t2).ratio() * 100.0
-
-    distance = _Distance()
-    fuzz = _Fuzz()
 
 
-def compute_jaccard(set1, set2):
+def calc_jaro_winkler(s1: str, s2: str) -> float:
+    """Compute Jaro-Winkler similarity in [0, 1]."""
+    if not s1 and not s2:
+        return 1.0
+    if not s1 or not s2:
+        return 0.0
+    if HAS_RAPIDFUZZ and distance is not None:
+        try:
+            return float(distance.JaroWinkler.similarity(s1, s2))
+        except (AttributeError, TypeError):
+            return float(distance.JaroWinkler.normalized_similarity(s1, s2))
+    return float(difflib.SequenceMatcher(None, s1, s2).ratio())
+
+
+def calc_levenshtein(s1: str, s2: str) -> float:
+    """Compute normalized Levenshtein similarity in [0, 1]."""
+    if not s1 and not s2:
+        return 1.0
+    if not s1 or not s2:
+        return 0.0
+    if HAS_RAPIDFUZZ and distance is not None:
+        try:
+            return float(distance.Levenshtein.normalized_similarity(s1, s2))
+        except (AttributeError, TypeError):
+            return float(distance.Levenshtein.similarity(s1, s2))
+    return float(difflib.SequenceMatcher(None, s1, s2).ratio())
+
+
+def calc_token_set_ratio(s1: str, s2: str) -> float:
+    """Compute token set ratio in [0, 1]."""
+    s1, s2 = str(s1), str(s2)
+    if HAS_RAPIDFUZZ and fuzz is not None:
+        return float(fuzz.token_set_ratio(s1, s2)) / 100.0
+
+    set1, set2 = set(s1.split()), set(s2.split())
+    if not set1 and not set2:
+        return 1.0
+    if not set1 or not set2:
+        return 0.0
+    inter = ' '.join(sorted(set1 & set2))
+    diff1 = ' '.join(sorted(set1 - set2))
+    diff2 = ' '.join(sorted(set2 - set1))
+    s1_sort = (inter + ' ' + diff1).strip()
+    s2_sort = (inter + ' ' + diff2).strip()
+    candidates = [difflib.SequenceMatcher(None, s1_sort, s2_sort).ratio()]
+    if inter:
+        candidates.append(difflib.SequenceMatcher(None, inter, s1_sort).ratio())
+        candidates.append(difflib.SequenceMatcher(None, inter, s2_sort).ratio())
+    return float(max(candidates))
+
+
+def calc_token_sort_ratio(s1: str, s2: str) -> float:
+    """Compute token sort ratio in [0, 1]."""
+    s1, s2 = str(s1), str(s2)
+    if HAS_RAPIDFUZZ and fuzz is not None:
+        return float(fuzz.token_sort_ratio(s1, s2)) / 100.0
+
+    t1 = ' '.join(sorted(s1.split()))
+    t2 = ' '.join(sorted(s2.split()))
+    return float(difflib.SequenceMatcher(None, t1, t2).ratio())
+
+
+def compute_jaccard(set1: Set[Any], set2: Set[Any]) -> float:
     if not set1 and not set2:
         return 1.0
     if not set1 or not set2:
@@ -91,33 +109,41 @@ def compute_jaccard(set1, set2):
     return inter / union if union > 0 else 0.0
 
 
-def get_char_ngrams(text, n=3):
+def get_char_ngrams(text: str, n: int = 3) -> Set[str]:
     if not text:
         return set()
     text = f" {text} "
     return set(text[i:i+n] for i in range(len(text)-n+1))
 
 
-def compute_features(pairs_df, s1_df, cands_df):
-    print("Normalizing entity dictionaries...")
-    # Pre-normalize and store as dicts for fast lookup
-    s1_dict = {}
-    for row in tqdm(s1_df.itertuples(index=False), total=len(s1_df), desc="Norm S1"):
-        n = normalize_name(getattr(row, 'business_name', ''))
-        a = normalize_address(getattr(row, 'business_address', ''))
-        n.update(a)
-        s1_dict[getattr(row, 'entity_id')] = n
+def compute_features(pairs_df: pd.DataFrame, s1_df: pd.DataFrame, cands_df: pd.DataFrame) -> pd.DataFrame:
+    # Normalize column names in pairs_df
+    col_map = {
+        'source1_entity_id': 's1_id',
+        'entity_id_1': 's1_id',
+        'entity_id_2': 'cand_id',
+        'candidate_id': 'cand_id'
+    }
+    pairs_df = pairs_df.rename(columns=col_map)
 
-    cands_dict = {}
-    for row in tqdm(cands_df.itertuples(index=False), total=len(cands_df), desc="Norm Cands"):
-        n = normalize_name(getattr(row, 'business_name', ''))
-        a = normalize_address(getattr(row, 'business_address', ''))
+    print("Normalizing entity dictionaries...")
+    s1_dict: Dict[str, Dict[str, Any]] = {}
+    for s1_id, name, addr in tqdm(zip(s1_df['entity_id'], s1_df['business_name'], s1_df['business_address']), total=len(s1_df), desc="Norm S1"):
+        n = normalize_name(name)
+        a = normalize_address(addr)
         n.update(a)
-        cands_dict[getattr(row, 'entity_id')] = n
+        s1_dict[str(s1_id)] = n
+
+    cands_dict: Dict[str, Dict[str, Any]] = {}
+    for c_id, name, addr in tqdm(zip(cands_df['entity_id'], cands_df['business_name'], cands_df['business_address']), total=len(cands_df), desc="Norm Cands"):
+        n = normalize_name(name)
+        a = normalize_address(addr)
+        n.update(a)
+        cands_dict[str(c_id)] = n
 
     print("Fitting TF-IDF models...")
-    all_names = [d['name_clean'] for d in s1_dict.values()] + [d['name_clean'] for d in cands_dict.values()]
-    all_addrs = [d['address_clean'] for d in s1_dict.values()] + [d['address_clean'] for d in cands_dict.values()]
+    all_names = [d.get('name_clean', '') for d in s1_dict.values()] + [d.get('name_clean', '') for d in cands_dict.values()]
+    all_addrs = [d.get('address_clean', '') for d in s1_dict.values()] + [d.get('address_clean', '') for d in cands_dict.values()]
 
     tfidf_name = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 4), min_df=2)
     tfidf_name.fit(all_names if all_names else [""])
@@ -125,25 +151,25 @@ def compute_features(pairs_df, s1_df, cands_df):
     tfidf_addr = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 4), min_df=2)
     tfidf_addr.fit(all_addrs if all_addrs else [""])
 
-    features = []
+    features: List[Dict[str, Any]] = []
 
     print("Extracting features per pair...")
-    s1_names_clean = []
-    cand_names_clean = []
-    s1_addrs_clean = []
-    cand_addrs_clean = []
+    s1_names_clean: List[str] = []
+    cand_names_clean: List[str] = []
+    s1_addrs_clean: List[str] = []
+    cand_addrs_clean: List[str] = []
 
-    s1_col = pairs_df['s1_id'].values
-    cand_col = pairs_df['cand_id'].values
+    s1_col = pairs_df['s1_id'].astype(str).values
+    cand_col = pairs_df['cand_id'].astype(str).values
 
     for s1_id, cand_id in tqdm(zip(s1_col, cand_col), total=len(pairs_df), desc="Pair features"):
         d1 = s1_dict.get(s1_id, {})
         d2 = cands_dict.get(cand_id, {})
 
-        n1 = d1.get('name_clean', '')
-        n2 = d2.get('name_clean', '')
-        a1 = d1.get('address_clean', '')
-        a2 = d2.get('address_clean', '')
+        n1 = str(d1.get('name_clean', ''))
+        n2 = str(d2.get('name_clean', ''))
+        a1 = str(d1.get('address_clean', ''))
+        a2 = str(d2.get('address_clean', ''))
 
         s1_names_clean.append(n1)
         cand_names_clean.append(n2)
@@ -156,13 +182,13 @@ def compute_features(pairs_df, s1_df, cands_df):
         t2_addr = set(d2.get('address_tokens', []))
 
         # 1. String distances
-        jw_name = distance.JaroWinkler.normalized_similarity(n1, n2)
-        lev_name = distance.Levenshtein.normalized_similarity(n1, n2)
-        ts_name = fuzz.token_set_ratio(n1, n2) / 100.0
-        tsort_name = fuzz.token_sort_ratio(n1, n2) / 100.0
+        jw_name = calc_jaro_winkler(n1, n2)
+        lev_name = calc_levenshtein(n1, n2)
+        ts_name = calc_token_set_ratio(n1, n2)
+        tsort_name = calc_token_sort_ratio(n1, n2)
 
-        jw_addr = distance.JaroWinkler.normalized_similarity(a1, a2)
-        lev_addr = distance.Levenshtein.normalized_similarity(a1, a2)
+        jw_addr = calc_jaro_winkler(a1, a2)
+        lev_addr = calc_levenshtein(a1, a2)
 
         # 2. Set metrics
         jaccard_name_tok = compute_jaccard(t1_name, t2_name)
@@ -172,10 +198,12 @@ def compute_features(pairs_df, s1_df, cands_df):
         jaccard_addr_3g = compute_jaccard(get_char_ngrams(a1, 3), get_char_ngrams(a2, 3))
 
         # 3. Domain specific
-        first_token_match = 1 if (d1.get('name_tokens') and d2.get('name_tokens') and d1['name_tokens'][0] == d2['name_tokens'][0]) else 0
+        n_tok1 = d1.get('name_tokens') or []
+        n_tok2 = d2.get('name_tokens') or []
+        first_token_match = 1 if (n_tok1 and n_tok2 and n_tok1[0] == n_tok2[0]) else 0
 
-        acronym1 = "".join(t[0] for t in d1.get('name_tokens', []) if t)
-        acronym2 = "".join(t[0] for t in d2.get('name_tokens', []) if t)
+        acronym1 = "".join(t[0] for t in n_tok1 if t)
+        acronym2 = "".join(t[0] for t in n_tok2 if t)
         acronym_match = 1 if (len(acronym1) >= 2 and len(acronym2) >= 2 and (acronym1 == acronym2 or acronym1 in n2 or acronym2 in n1)) else 0
 
         num1 = set(d1.get('numeric_tokens', []))
@@ -285,9 +313,7 @@ def main():
 
     print("Merging ground truth to create 'is_match' label...")
     gt_pairs = set()
-    for row in gt.itertuples(index=False):
-        s1_id = getattr(row, 'source1_entity_id')
-        matches = getattr(row, 'matches', [])
+    for s1_id, matches in zip(gt['source1_entity_id'], gt['matches']):
         for match in matches:
             gt_pairs.add((s1_id, match))
 

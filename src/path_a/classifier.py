@@ -10,6 +10,7 @@ import sys
 import argparse
 from pathlib import Path
 from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import GroupKFold
@@ -24,37 +25,38 @@ if str(REPO_ROOT) not in sys.path:
 from eval.f05 import macro_f05
 from src.common.data_loader import load_all_sources
 
-# Optional tree boosting backends
+# Optional tree boosting backends with type ignores for static analyzers
 try:
-    import xgboost as xgb
+    import xgboost as xgb  # type: ignore[import-not-found, import-untyped]
     HAS_XGB = True
 except ImportError:
+    xgb = None
     HAS_XGB = False
 
 try:
-    import lightgbm as lgb
+    import lightgbm as lgb  # type: ignore[import-not-found, import-untyped]
     HAS_LGB = True
 except ImportError:
+    lgb = None
     HAS_LGB = False
 
 
-def threshold_predictions(pairs_df, threshold):
+def threshold_predictions(pairs_df: pd.DataFrame, threshold: float) -> Dict[str, List[str]]:
     """Convert scores to a dictionary format for F0.5 evaluation."""
-    preds = defaultdict(list)
-    for row in pairs_df.itertuples(index=False):
-        s1 = getattr(row, 's1_id')
-        cand = getattr(row, 'cand_id')
-        score = getattr(row, 'score')
+    preds: Dict[str, List[str]] = defaultdict(list)
+    s1_col = pairs_df['s1_id'].astype(str).values
+    cand_col = pairs_df['cand_id'].astype(str).values
+    score_col = pairs_df['score'].astype(float).values
+
+    for s1, cand, score in zip(s1_col, cand_col, score_col):
         if score >= threshold:
             preds[s1].append(cand)
     return dict(preds)
 
 
-def create_classifier(model_type="auto"):
+def create_classifier(model_type: str = "auto") -> Tuple[str, Any]:
     """Instantiate classifier based on requested type and environment availability."""
-    if model_type == "xgboost" or (model_type == "auto" and HAS_XGB):
-        if not HAS_XGB:
-            raise ImportError("XGBoost is requested but not installed.")
+    if (model_type in ("xgboost", "auto")) and HAS_XGB and xgb is not None:
         return "xgb", xgb.XGBClassifier(
             n_estimators=150,
             max_depth=6,
@@ -63,9 +65,10 @@ def create_classifier(model_type="auto"):
             eval_metric='auc',
             n_jobs=-1
         )
-    elif model_type == "lightgbm" or (model_type == "auto" and HAS_LGB):
-        if not HAS_LGB:
-            raise ImportError("LightGBM is requested but not installed.")
+    if model_type == "xgboost" and (not HAS_XGB or xgb is None):
+        raise ImportError("XGBoost is requested but not installed. Install with: pip install xgboost")
+
+    if (model_type in ("lightgbm", "auto")) and HAS_LGB and lgb is not None:
         return "lgb", lgb.LGBMClassifier(
             n_estimators=150,
             max_depth=6,
@@ -74,15 +77,18 @@ def create_classifier(model_type="auto"):
             n_jobs=-1,
             verbose=-1
         )
-    else:
-        if model_type != "auto" and model_type != "histgb":
-            print(f"Requested model '{model_type}' not available, falling back to HistGradientBoostingClassifier.")
-        return "histgb", HistGradientBoostingClassifier(
-            max_iter=150,
-            max_depth=6,
-            learning_rate=0.1,
-            random_state=42
-        )
+    if model_type == "lightgbm" and (not HAS_LGB or lgb is None):
+        raise ImportError("LightGBM is requested but not installed. Install with: pip install lightgbm")
+
+    if model_type not in ("auto", "histgb"):
+        print(f"Requested model '{model_type}' not available, falling back to HistGradientBoostingClassifier.")
+
+    return "histgb", HistGradientBoostingClassifier(
+        max_iter=150,
+        max_depth=6,
+        learning_rate=0.1,
+        random_state=42
+    )
 
 
 def main():
@@ -141,6 +147,10 @@ def main():
     exclude_cols = {'s1_id', 'cand_id', 'is_match', 'country'}  # country is explicitly forbidden
     feature_cols = sorted(list((set(train_df.columns) & set(val_df.columns)) - exclude_cols))
 
+    if not feature_cols:
+        print("Error: No common feature columns found between train and validation sets.")
+        return
+
     print(f"Features used ({len(feature_cols)}): {feature_cols}")
 
     X_train = train_df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
@@ -152,7 +162,7 @@ def main():
     backend_name, _ = create_classifier(args.model)
     print(f"\n--- Running GroupKFold CV on Train set (Backend: {backend_name}) ---")
     gkf = GroupKFold(n_splits=min(5, len(groups_train.unique())))
-    cv_aucs = []
+    cv_aucs: List[float] = []
 
     for fold, (trn_idx, val_idx) in enumerate(gkf.split(X_train, y_train, groups=groups_train)):
         X_t, y_t = X_train.iloc[trn_idx], y_train.iloc[trn_idx]
@@ -170,7 +180,7 @@ def main():
         preds = fold_model.predict_proba(X_v)[:, 1]
 
         if len(np.unique(y_v)) > 1:
-            auc = roc_auc_score(y_v, preds)
+            auc = float(roc_auc_score(y_v, preds))
             cv_aucs.append(auc)
             print(f" Fold {fold+1} AUC: {auc:.4f}")
         else:
@@ -194,20 +204,19 @@ def main():
     try:
         _, _, _, gt_df = load_all_sources(train_dir=args.data_dir)
         gt_dict = {}
-        for row in gt_df.itertuples(index=False):
-            s1_id = getattr(row, 'source1_entity_id')
+        for s1_id, matches in zip(gt_df['source1_entity_id'], gt_df['matches']):
             if s1_id in val_ids:
-                gt_dict[s1_id] = getattr(row, 'matches', [])
+                gt_dict[str(s1_id)] = matches
 
         if gt_dict and len(val_df) > 0:
             best_thresh = 0.5
             best_f05 = 0.0
             for thresh in np.arange(0.1, 0.9, 0.05):
-                pred_dict = threshold_predictions(val_df, thresh)
+                pred_dict = threshold_predictions(val_df, float(thresh))
                 f05 = macro_f05(pred_dict, gt_dict)
                 if f05 > best_f05:
                     best_f05 = f05
-                    best_thresh = thresh
+                    best_thresh = float(thresh)
             print(f"Best Validation Macro F0.5: {best_f05:.4f} (at threshold {best_thresh:.2f})")
         else:
             print("Validation ground truth empty or no matches in validation set; skipping F0.5 grid search.")

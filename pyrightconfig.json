@@ -1,0 +1,5 @@
+{
+  "include": ["src", "eval", "tests"],
+  "extraPaths": [".", "src"],
+  "reportMissingImports": "warning"
+}
