@@ -216,6 +216,9 @@ corpus_emb = bi_encoder.encode(
     convert_to_numpy=True, normalize_embeddings=True
 )
 print(f"Corpus encoded: {corpus_emb.shape}  ({time.time()-t0:.1f}s)")
+del corpus_texts
+import gc
+gc.collect()
 
 # ============================================================
 # CELL 7: Encode S1 & Retrieve Top-20 Candidates
@@ -229,6 +232,14 @@ s1_emb = bi_encoder.encode(
     convert_to_numpy=True, normalize_embeddings=True
 )
 print(f"S1 encoded: {s1_emb.shape}  ({time.time()-t0:.1f}s)")
+del s1_texts
+try:
+    del bi_encoder
+except:
+    pass
+gc.collect()
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
 
 print(f"\nTop-{TOP_K} retrieval via batched cosine similarity...")
 t0 = time.time()
@@ -275,29 +286,55 @@ for df in (s1, s2, s3):
         else:
             all_lookup[eid] = name
 
+del s1, s2, s3
+gc.collect()
+
 if CE_PATH:
     print(f"Model: {CE_PATH}")
     cross_encoder = CrossEncoder(CE_PATH, device=DEVICE)
 
-    ce_pairs, ce_meta = [], []
+    final = {}
+    ce_pairs_batch = []
+    ce_meta_batch = []
+    
+    total_cands = sum(len(c) for c in candidates.values())
+    print(f"Total CE pairs to process: {total_cands:,}")
+    pbar = tqdm(total=total_cands, desc="CE Re-ranking")
+
+    def process_ce_batch():
+        if not ce_pairs_batch: return
+        ce_scores = cross_encoder.predict(
+            ce_pairs_batch, batch_size=256, show_progress_bar=False,
+            convert_to_numpy=True, apply_softmax=True
+        )
+        for (sid, cid), ce_sc in zip(ce_meta_batch, ce_scores):
+            sc = float(ce_sc[1]) if hasattr(ce_sc, "__len__") else float(ce_sc)
+            final.setdefault(sid, []).append((cid, sc))
+        ce_pairs_batch.clear()
+        ce_meta_batch.clear()
+
+    t0 = time.time()
     for sid, cands in candidates.items():
         s1_txt = all_lookup.get(sid, sid)
         for cid, bi_sc in cands:
-            ce_pairs.append([s1_txt, all_lookup.get(cid, cid)])
-            ce_meta.append((sid, cid, bi_sc))
-
-    print(f"Total CE pairs: {len(ce_pairs):,}")
-    t0 = time.time()
-    ce_scores = cross_encoder.predict(
-        ce_pairs, batch_size=256, show_progress_bar=True,
-        convert_to_numpy=True, apply_softmax=True
-    )
+            ce_pairs_batch.append([s1_txt, all_lookup.get(cid, cid)])
+            ce_meta_batch.append((sid, cid))
+            
+            if len(ce_pairs_batch) >= 100000:
+                process_ce_batch()
+                pbar.update(100000)
+                
+    if ce_pairs_batch:
+        remaining = len(ce_pairs_batch)
+        process_ce_batch()
+        pbar.update(remaining)
+    pbar.close()
     print(f"Re-ranking done ({time.time()-t0:.1f}s)")
-
-    final = {}
-    for (sid, cid, _), ce_sc in zip(ce_meta, ce_scores):
-        sc = float(ce_sc[1]) if hasattr(ce_sc, "__len__") else float(ce_sc)
-        final.setdefault(sid, []).append((cid, sc))
+    
+    del cross_encoder
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 else:
     print("WARNING: Cross-encoder not found. Using bi-encoder scores only.")
     final = candidates
