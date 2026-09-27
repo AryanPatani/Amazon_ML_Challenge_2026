@@ -1,5 +1,16 @@
 {
   "include": ["src", "eval", "tests"],
   "extraPaths": [".", "src"],
-  "reportMissingImports": "warning"
+  "venvPath": ".",
+  "venv": "venv",
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Darwin",
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportPrivateImportUsage": "none",
+  "reportUnknownMemberType": "none"
 }

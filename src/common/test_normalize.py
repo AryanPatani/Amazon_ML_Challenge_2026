@@ -12,7 +12,10 @@ If you have pytest installed, this also works with:
     pytest test_normalize.py -v
 """
 
-from normalize import normalize_name, normalize_address
+try:
+    from normalize import normalize_name, normalize_address
+except ImportError:
+    from src.common.normalize import normalize_name, normalize_address
 
 failures = []
 

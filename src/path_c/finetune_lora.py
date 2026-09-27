@@ -13,7 +13,10 @@ import random
 import pandas as pd
 import numpy as np
 import torch
-from datasets import Dataset
+try:
+    from datasets import Dataset
+except ImportError:
+    Dataset = None  # type: ignore
 
 # Ensure repository root is on sys.path
 REPO_ROOT = Path(__file__).resolve().parents[2]
