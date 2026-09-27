@@ -27,52 +27,104 @@ from pathlib import Path
 # ============================================================
 # CELL 1: Setup
 # ============================================================
-# Locate code root
+# Locate code root with multi-stage discovery & fallback
 POSSIBLE_CODE_ROOTS = [
     "/kaggle/input/datasets/vivantejani/ml-code/ml-code",
+    "/kaggle/input/datasets/vivantejani/ml-code",
+    "/kaggle/input/datasets/vivantejani",
     "/kaggle/input/ml-code/Amazon_ML_Challenge_2026",
     "/kaggle/input/ml-code",
     "/kaggle/working/ml-code",
     "/kaggle/working/Amazon_ML_Challenge_2026",
 ]
 CODE_ROOT = next((p for p in POSSIBLE_CODE_ROOTS if (Path(p) / "src").exists()), None)
-if not CODE_ROOT:
-    try:
-        CODE_ROOT = str(next(Path("/kaggle/input").rglob("src/path_a/features.py")).parent.parent.parent)
-    except StopIteration:
-        print("\n" + "!" * 80)
-        print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
-        print("!" * 80)
-        print("It looks like the 'ml-code' dataset is not attached, or the directory structure is wrong.")
-        print("Please check the following:")
-        print("1. Did you attach the dataset containing our repository code?")
-        print("2. Expand the attached datasets in the right sidebar. You should see a 'src' folder somewhere.")
-        print("3. If you see it, update the POSSIBLE_CODE_ROOTS list in this cell with that path.")
-        print("\nHere are the directories currently found in /kaggle/input/:")
-        import glob
-        for d in glob.glob("/kaggle/input/*"):
-            print(f" - {d}")
-            for sub_d in glob.glob(f"{d}/*"):
-                print(f"    - {sub_d}")
-        print("!" * 80)
-        raise FileNotFoundError("Code root not found. Please attach the repo dataset.")
 
-print(f"Code root: {CODE_ROOT}")
+# Search recursively for features.py if not in default paths
+if not CODE_ROOT:
+    for p in Path("/kaggle").rglob("features.py"):
+        if p.parent.name == "path_a" and (p.parent.parent.name == "src"):
+            CODE_ROOT = str(p.parent.parent.parent)
+            break
+
+# Auto-extract any zip files in /kaggle/input if code wasn't found
+if not CODE_ROOT:
+    zip_files = list(Path("/kaggle/input").rglob("*.zip"))
+    if zip_files:
+        import zipfile
+        for zf in zip_files:
+            print(f"📦 Found zip archive: {zf.name}. Extracting to /kaggle/working/ml-code...")
+            try:
+                with zipfile.ZipFile(zf, 'r') as zip_ref:
+                    zip_ref.extractall("/kaggle/working/ml-code")
+            except Exception as e:
+                print(f"Extraction warning: {e}")
+        for p in Path("/kaggle/working/ml-code").rglob("features.py"):
+            if p.parent.name == "path_a":
+                CODE_ROOT = str(p.parent.parent.parent)
+                break
+
+# Git clone fallback (if Internet is ON in Kaggle settings)
+if not CODE_ROOT:
+    print("🌐 Attempting to clone repository from GitHub...")
+    clone_res = subprocess.run(
+        ["git", "clone", "https://github.com/AryanPatani/Amazon_ML_Challenge_2026.git", "/kaggle/working/ml-code"],
+        capture_output=True, text=True
+    )
+    if (Path("/kaggle/working/ml-code") / "src").exists():
+        CODE_ROOT = "/kaggle/working/ml-code"
+        print("✅ Cloned successfully from GitHub!")
+
+if not CODE_ROOT:
+    print("\n" + "!" * 80)
+    print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
+    print("!" * 80)
+    print("Here is the FULL directory tree of /kaggle/input:")
+    for root, dirs, files in os.walk("/kaggle/input"):
+        level = root.replace("/kaggle/input", "").count(os.sep)
+        indent = " " * 4 * level
+        print(f"{indent}{os.path.basename(root)}/")
+        subindent = " " * 4 * (level + 1)
+        for f in files[:8]:
+            print(f"{subindent}{f}")
+        if len(files) > 8:
+            print(f"{subindent}... and {len(files) - 8} more files")
+    print("!" * 80)
+    raise FileNotFoundError(
+        "Code root not found. Please enable Internet in Kaggle settings (right sidebar -> Internet: ON) "
+        "or attach the repository dataset."
+    )
+
+print(f"✅ Code root: {CODE_ROOT}")
 sys.path.insert(0, CODE_ROOT)
-os.chdir(CODE_ROOT)
+os.chdir("/kaggle/working")
 
 # Locate training data
 TRAIN_DIR = None
 for p in Path("/kaggle").rglob("train_source1.tsv"):
     TRAIN_DIR = str(p.parent)
     break
-print(f"Train data: {TRAIN_DIR}")
+
+if not TRAIN_DIR:
+    print("\n" + "!" * 80)
+    print("ERROR: COULD NOT FIND COMPETITION DATASET (train_source1.tsv)")
+    print("!" * 80)
+    print("The competition dataset is NOT currently attached to this notebook.")
+    print("To fix this:")
+    print("1. In the right sidebar, click '+ Add Data' (or 'Add Input').")
+    print("2. Search for the competition dataset (containing train_source1.tsv).")
+    print("3. Click the '+' button to add it, then re-run this cell.")
+    print("!" * 80)
+    raise FileNotFoundError("Competition training data not found. Please attach the dataset.")
+
+print(f"✅ Train data: {TRAIN_DIR}")
 
 OUTPUT_DIR = Path("/kaggle/working/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Install dependencies
-os.system("pip install -q rapidfuzz phonetics sentence-transformers xgboost")
+print("📦 Installing dependencies (rapidfuzz, phonetics, sentence-transformers, xgboost)...")
+subprocess.run(["pip", "install", "-q", "rapidfuzz", "phonetics", "sentence-transformers", "xgboost"], check=True)
+print("✅ Environment ready!")
 
 import numpy as np
 import pandas as pd
@@ -117,7 +169,29 @@ s1_ids = list(s1["entity_id"])
 # CELL 3: Bi-Encoder Candidate Generation
 # ============================================================
 print("\n=== GENERATING CANDIDATES (BI-ENCODER) ===")
-BI_PATH = next((p for p in [f"{CODE_ROOT}/models/bi_encoder_b2", "/kaggle/working/models/bi_encoder_b2"] if Path(p).exists()), "sentence-transformers/all-MiniLM-L6-v2")
+# Locate fine-tuned bi-encoder model
+BI_PATH = None
+for p in [f"{CODE_ROOT}/models/bi_encoder_b2", "/kaggle/working/models/bi_encoder_b2"]:
+    if Path(p).exists() and (Path(p) / "modules.json").exists():
+        BI_PATH = p
+        break
+
+if not BI_PATH:
+    for p in Path("/kaggle").rglob("bi_encoder_b2"):
+        if (p / "modules.json").exists():
+            BI_PATH = str(p)
+            break
+
+if not BI_PATH:
+    for p in Path("/kaggle").rglob("modules.json"):
+        if "cross" not in str(p):
+            BI_PATH = str(p.parent)
+            break
+
+if not BI_PATH:
+    print("⚠️ Fine-tuned bi_encoder_b2 not found. Falling back to all-MiniLM-L6-v2.")
+    BI_PATH = "sentence-transformers/all-MiniLM-L6-v2"
+
 print(f"Loading Bi-Encoder: {BI_PATH}")
 bi_encoder = SentenceTransformer(BI_PATH, device=DEVICE)
 
@@ -179,12 +253,39 @@ subprocess.run(sample_cmd, check=True)
 # CELL 6: Train XGBoost Classifier
 # ============================================================
 print("\n=== TRAINING XGBOOST CLASSIFIER ===")
-train_cmd = [
-    sys.executable, f"{CODE_ROOT}/src/path_a/classifier.py",
-    "--train", str(OUTPUT_DIR / "a3_train_sampled.parquet"),
-    "--out", str(OUTPUT_DIR / "path_a_xgb_optimized.json")
-]
-subprocess.run(train_cmd, check=True)
+import xgboost as xgb
+
+train_df = pd.read_parquet(OUTPUT_DIR / "a3_train_sampled.parquet")
+exclude_cols = {'s1_id', 'cand_id', 'is_match', 'country'}
+feature_cols = sorted([c for c in train_df.columns if c not in exclude_cols])
+print(f"Features used ({len(feature_cols)}): {feature_cols}")
+
+X_train = train_df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+y_train = train_df['is_match'].astype(int)
+
+use_gpu = torch.cuda.is_available()
+print(f"Fitting XGBoost on {'GPU (CUDA)' if use_gpu else 'CPU'} ({len(X_train):,} pairs)...")
+clf = xgb.XGBClassifier(
+    n_estimators=300,
+    max_depth=6,
+    learning_rate=0.08,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    tree_method="hist",
+    device="cuda" if use_gpu else "cpu",
+    eval_metric="logloss",
+    random_state=42
+)
+clf.fit(X_train, y_train)
+
+model_path = OUTPUT_DIR / "path_a_xgb_optimized.json"
+clf.save_model(str(model_path))
+print(f"✅ Saved trained XGBoost model to: {model_path}")
+
+# Feature importances
+importances = pd.Series(clf.feature_importances_, index=feature_cols).sort_values(ascending=False)
+print("\nTop 10 Feature Importances:")
+print(importances.head(10))
 
 print("\n" + "="*60)
 print("✅ TRAINING COMPLETE!")

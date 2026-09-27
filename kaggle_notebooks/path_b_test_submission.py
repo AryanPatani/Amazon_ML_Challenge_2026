@@ -33,43 +33,74 @@ Expected validation F0.5: ~97.97%  |  Threshold: 0.95
 import os, sys, time, subprocess
 from pathlib import Path
 
-# --- Locate code root (adjust if upload path differs) ---
+# --- Locate code root (multi-stage discovery & fallback) ---
 POSSIBLE_CODE_ROOTS = [
     "/kaggle/input/datasets/vivantejani/ml-code/ml-code",
+    "/kaggle/input/datasets/vivantejani/ml-code",
+    "/kaggle/input/datasets/vivantejani",
     "/kaggle/input/ml-code/Amazon_ML_Challenge_2026",
     "/kaggle/input/ml-code",
     "/kaggle/working/ml-code",
     "/kaggle/working/Amazon_ML_Challenge_2026",
 ]
-CODE_ROOT = None
-for path in POSSIBLE_CODE_ROOTS:
-    if Path(path).exists() and (Path(path) / "src").exists():
-        CODE_ROOT = path
-        break
-if CODE_ROOT is None:
-    try:
-        CODE_ROOT = str(next(Path("/kaggle/input").rglob("src/path_b/b3_pipeline.py")).parent.parent.parent)
-    except StopIteration:
-        print("\n" + "!" * 80)
-        print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
-        print("!" * 80)
-        print("It looks like the 'ml-code' dataset is not attached, or the directory structure is wrong.")
-        print("Please check the following:")
-        print("1. Did you attach the dataset containing our repository code?")
-        print("2. Expand the attached datasets in the right sidebar. You should see a 'src' folder somewhere.")
-        print("3. If you see it, update the POSSIBLE_CODE_ROOTS list in this cell with that path.")
-        print("\nHere are the directories currently found in /kaggle/input/:")
-        import glob
-        for d in glob.glob("/kaggle/input/*"):
-            print(f" - {d}")
-            for sub_d in glob.glob(f"{d}/*"):
-                print(f"    - {sub_d}")
-        print("!" * 80)
-        raise FileNotFoundError("Code root not found. Please attach the repo dataset.")
-if CODE_ROOT is None:
-    raise FileNotFoundError("Code root not found. Attach the ml-code dataset containing src/.")
+CODE_ROOT = next((p for p in POSSIBLE_CODE_ROOTS if (Path(p) / "src").exists()), None)
 
-print(f"Code root: {CODE_ROOT}")
+# Search recursively for b3_pipeline.py if not in default paths
+if not CODE_ROOT:
+    for p in Path("/kaggle").rglob("b3_pipeline.py"):
+        if p.parent.name == "path_b" and (p.parent.parent.name == "src"):
+            CODE_ROOT = str(p.parent.parent.parent)
+            break
+
+# Auto-extract any zip files in /kaggle/input if code wasn't found
+if not CODE_ROOT:
+    zip_files = list(Path("/kaggle/input").rglob("*.zip"))
+    if zip_files:
+        import zipfile
+        for zf in zip_files:
+            print(f"📦 Found zip archive: {zf.name}. Extracting to /kaggle/working/ml-code...")
+            try:
+                with zipfile.ZipFile(zf, 'r') as zip_ref:
+                    zip_ref.extractall("/kaggle/working/ml-code")
+            except Exception as e:
+                print(f"Extraction warning: {e}")
+        for p in Path("/kaggle/working/ml-code").rglob("b3_pipeline.py"):
+            if p.parent.name == "path_b":
+                CODE_ROOT = str(p.parent.parent.parent)
+                break
+
+# Git clone fallback (if Internet is ON in Kaggle settings)
+if not CODE_ROOT:
+    print("🌐 Attempting to clone repository from GitHub...")
+    subprocess.run(
+        ["git", "clone", "https://github.com/AryanPatani/Amazon_ML_Challenge_2026.git", "/kaggle/working/ml-code"],
+        capture_output=True, text=True
+    )
+    if (Path("/kaggle/working/ml-code") / "src").exists():
+        CODE_ROOT = "/kaggle/working/ml-code"
+        print("✅ Cloned successfully from GitHub!")
+
+if not CODE_ROOT:
+    print("\n" + "!" * 80)
+    print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
+    print("!" * 80)
+    print("Here is the FULL directory tree of /kaggle/input:")
+    for root, dirs, files in os.walk("/kaggle/input"):
+        level = root.replace("/kaggle/input", "").count(os.sep)
+        indent = " " * 4 * level
+        print(f"{indent}{os.path.basename(root)}/")
+        subindent = " " * 4 * (level + 1)
+        for f in files[:8]:
+            print(f"{subindent}{f}")
+        if len(files) > 8:
+            print(f"{subindent}... and {len(files) - 8} more files")
+    print("!" * 80)
+    raise FileNotFoundError(
+        "Code root not found. Please enable Internet in Kaggle settings (right sidebar -> Internet: ON) "
+        "or attach the repository dataset."
+    )
+
+print(f"✅ Code root: {CODE_ROOT}")
 sys.path.insert(0, CODE_ROOT)
 os.chdir(CODE_ROOT)
 
@@ -78,9 +109,20 @@ TEST_DIR = None
 for p in Path("/kaggle").rglob("test_source1.tsv"):
     TEST_DIR = str(p.parent)
     break
+
 if TEST_DIR is None:
-    raise FileNotFoundError("test_source1.tsv not found. Attach the competition dataset.")
-print(f"Test data: {TEST_DIR}")
+    print("\n" + "!" * 80)
+    print("ERROR: COULD NOT FIND COMPETITION TEST DATA (test_source1.tsv)")
+    print("!" * 80)
+    print("The competition dataset is NOT currently attached to this notebook.")
+    print("To fix this:")
+    print("1. In the right sidebar, click '+ Add Data' (or 'Add Input').")
+    print("2. Search for the competition dataset (containing test_source1.tsv).")
+    print("3. Click the '+' button to add it, then re-run this cell.")
+    print("!" * 80)
+    raise FileNotFoundError("test_source1.tsv not found. Please attach the competition dataset.")
+
+print(f"✅ Test data: {TEST_DIR}")
 
 OUTPUT_DIR = Path("/kaggle/working/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -142,14 +184,29 @@ print(f"S1: {len(s1_texts):,}  Corpus: {len(corpus_texts):,}  ({time.time()-t0:.
 # ============================================================
 # CELL 6: Load Bi-Encoder & Encode Corpus
 # ============================================================
-print("\n=== ENCODING CORPUS WITH BI-ENCODER ===")
-BI_PATH = next(
-    (p for p in [
-        f"{CODE_ROOT}/models/bi_encoder_b2",
-        "/kaggle/working/models/bi_encoder_b2",
-    ] if Path(p).exists()),
-    "sentence-transformers/all-MiniLM-L6-v2"  # fallback
-)
+# Locate fine-tuned bi-encoder model
+BI_PATH = None
+for p in [f"{CODE_ROOT}/models/bi_encoder_b2", "/kaggle/working/models/bi_encoder_b2"]:
+    if Path(p).exists() and (Path(p) / "modules.json").exists():
+        BI_PATH = p
+        break
+
+if not BI_PATH:
+    for p in Path("/kaggle").rglob("bi_encoder_b2"):
+        if (p / "modules.json").exists():
+            BI_PATH = str(p)
+            break
+
+if not BI_PATH:
+    for p in Path("/kaggle").rglob("modules.json"):
+        if "cross" not in str(p):
+            BI_PATH = str(p.parent)
+            break
+
+if not BI_PATH:
+    print("⚠️ Fine-tuned bi_encoder_b2 not found. Falling back to all-MiniLM-L6-v2.")
+    BI_PATH = "sentence-transformers/all-MiniLM-L6-v2"
+
 print(f"Model: {BI_PATH}")
 bi_encoder = SentenceTransformer(BI_PATH, device=DEVICE)
 
@@ -194,13 +251,17 @@ print(f"Retrieval done ({time.time()-t0:.1f}s)")
 # CELL 8: Cross-Encoder Re-Ranking
 # ============================================================
 print("\n=== CROSS-ENCODER RE-RANKING ===")
-CE_PATH = next(
-    (p for p in [
-        f"{CODE_ROOT}/models/cross_encoder_b3",
-        "/kaggle/working/models/cross_encoder_b3",
-    ] if Path(p).exists()),
-    None
-)
+CE_PATH = None
+for p in [f"{CODE_ROOT}/models/cross_encoder_b3", "/kaggle/working/models/cross_encoder_b3"]:
+    if Path(p).exists() and (Path(p) / "config.json").exists():
+        CE_PATH = p
+        break
+
+if not CE_PATH:
+    for p in Path("/kaggle").rglob("cross_encoder_b3"):
+        if (p / "config.json").exists():
+            CE_PATH = str(p)
+            break
 
 # Build entity text lookup
 all_lookup = {}
