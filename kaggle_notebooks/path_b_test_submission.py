@@ -47,9 +47,25 @@ for path in POSSIBLE_CODE_ROOTS:
         CODE_ROOT = path
         break
 if CODE_ROOT is None:
-    for p in Path("/kaggle/input").rglob("src/path_b/b3_pipeline.py"):
-        CODE_ROOT = str(p.parent.parent.parent)
-        break
+    try:
+        CODE_ROOT = str(next(Path("/kaggle/input").rglob("src/path_b/b3_pipeline.py")).parent.parent.parent)
+    except StopIteration:
+        print("\n" + "!" * 80)
+        print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
+        print("!" * 80)
+        print("It looks like the 'ml-code' dataset is not attached, or the directory structure is wrong.")
+        print("Please check the following:")
+        print("1. Did you attach the dataset containing our repository code?")
+        print("2. Expand the attached datasets in the right sidebar. You should see a 'src' folder somewhere.")
+        print("3. If you see it, update the POSSIBLE_CODE_ROOTS list in this cell with that path.")
+        print("\nHere are the directories currently found in /kaggle/input/:")
+        import glob
+        for d in glob.glob("/kaggle/input/*"):
+            print(f" - {d}")
+            for sub_d in glob.glob(f"{d}/*"):
+                print(f"    - {sub_d}")
+        print("!" * 80)
+        raise FileNotFoundError("Code root not found. Please attach the repo dataset.")
 if CODE_ROOT is None:
     raise FileNotFoundError("Code root not found. Attach the ml-code dataset containing src/.")
 
