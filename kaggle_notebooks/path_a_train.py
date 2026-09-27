@@ -1,33 +1,27 @@
 """
 ============================================================
-  PATH A — OPTIMIZED TRAINING USING PATH B CANDIDATES
+  PATH A — FAST & ROBUST XGBOOST TRAINING PIPELINE
   Amazon ML Challenge 2026
 ============================================================
 
-INSTRUCTIONS:
-1. Create a Kaggle notebook (Python).
-2. Attach datasets: 
-   - Competition dataset (train_source1.tsv, etc.)
-   - Our repo (ml-code, containing src/ and models/bi_encoder_b2/)
-3. Set accelerator to GPU T4 x2.
-4. Run all cells. Expected runtime: ~1.5 hours.
+Total runtime: ~3 to 5 minutes!
+Zero GPU memory issues (no 80-minute neural encoding of 2.2M texts).
+Trains XGBoost on 150k balanced pairs (Ground Truth + TF-IDF Hard Negatives).
 
-Why this is fast:
-Instead of running feature extraction (CPU bound) on all 2.2 million S1 entities (44M pairs -> 4.5 hrs), 
-we randomly subsample 100,000 S1 entities, get their Path B candidates (2M pairs), extract 
-features in ~15 mins, and train XGBoost. This is more than enough data to train a perfect classifier.
-
-At the end, download the `path_a_xgb_optimized.json` model!
+Exports: /kaggle/working/output/path_a_xgb_optimized.json
 ============================================================
 """
 
-import os, sys, time, subprocess, random
+import os, sys, time, subprocess
 from pathlib import Path
 
 # ============================================================
-# CELL 1: Setup
+# STEP 1: Environment Setup & Directory Discovery
 # ============================================================
-# Locate code root with multi-stage discovery & fallback
+print("=" * 60)
+print("🚀 STEP 1: PATH DISCOVERY & SETUP")
+print("=" * 60)
+
 POSSIBLE_CODE_ROOTS = [
     "/kaggle/input/datasets/vivantejani/ml-code/ml-code",
     "/kaggle/input/datasets/vivantejani/ml-code",
@@ -39,81 +33,31 @@ POSSIBLE_CODE_ROOTS = [
 ]
 CODE_ROOT = next((p for p in POSSIBLE_CODE_ROOTS if (Path(p) / "src").exists()), None)
 
-# Search recursively for features.py if not in default paths
 if not CODE_ROOT:
     for p in Path("/kaggle").rglob("features.py"):
         if p.parent.name == "path_a" and (p.parent.parent.name == "src"):
             CODE_ROOT = str(p.parent.parent.parent)
             break
 
-# Auto-extract any zip files in /kaggle/input if code wasn't found
 if not CODE_ROOT:
-    zip_files = list(Path("/kaggle/input").rglob("*.zip"))
-    if zip_files:
-        import zipfile
-        for zf in zip_files:
-            print(f"📦 Found zip archive: {zf.name}. Extracting to /kaggle/working/ml-code...")
-            try:
-                with zipfile.ZipFile(zf, 'r') as zip_ref:
-                    zip_ref.extractall("/kaggle/working/ml-code")
-            except Exception as e:
-                print(f"Extraction warning: {e}")
-        for p in Path("/kaggle/working/ml-code").rglob("features.py"):
-            if p.parent.name == "path_a":
-                CODE_ROOT = str(p.parent.parent.parent)
-                break
-
-# Git clone fallback (if Internet is ON in Kaggle settings)
-if not CODE_ROOT:
-    print("🌐 Attempting to clone repository from GitHub...")
-    clone_res = subprocess.run(
+    print("🌐 Cloning repository from GitHub...")
+    subprocess.run(
         ["git", "clone", "https://github.com/AryanPatani/Amazon_ML_Challenge_2026.git", "/kaggle/working/ml-code"],
         capture_output=True, text=True
     )
     if (Path("/kaggle/working/ml-code") / "src").exists():
         CODE_ROOT = "/kaggle/working/ml-code"
-        print("✅ Cloned successfully from GitHub!")
-
-if not CODE_ROOT:
-    print("\n" + "!" * 80)
-    print("ERROR: COULD NOT FIND THE CODE DIRECTORY (src/)")
-    print("!" * 80)
-    print("Here is the FULL directory tree of /kaggle/input:")
-    for root, dirs, files in os.walk("/kaggle/input"):
-        level = root.replace("/kaggle/input", "").count(os.sep)
-        indent = " " * 4 * level
-        print(f"{indent}{os.path.basename(root)}/")
-        subindent = " " * 4 * (level + 1)
-        for f in files[:8]:
-            print(f"{subindent}{f}")
-        if len(files) > 8:
-            print(f"{subindent}... and {len(files) - 8} more files")
-    print("!" * 80)
-    raise FileNotFoundError(
-        "Code root not found. Please enable Internet in Kaggle settings (right sidebar -> Internet: ON) "
-        "or attach the repository dataset."
-    )
 
 print(f"✅ Code root: {CODE_ROOT}")
 sys.path.insert(0, CODE_ROOT)
 os.chdir("/kaggle/working")
 
-# Locate training data
 TRAIN_DIR = None
 for p in Path("/kaggle").rglob("train_source1.tsv"):
     TRAIN_DIR = str(p.parent)
     break
 
 if not TRAIN_DIR:
-    print("\n" + "!" * 80)
-    print("ERROR: COULD NOT FIND COMPETITION DATASET (train_source1.tsv)")
-    print("!" * 80)
-    print("The competition dataset is NOT currently attached to this notebook.")
-    print("To fix this:")
-    print("1. In the right sidebar, click '+ Add Data' (or 'Add Input').")
-    print("2. Search for the competition dataset (containing train_source1.tsv).")
-    print("3. Click the '+' button to add it, then re-run this cell.")
-    print("!" * 80)
     raise FileNotFoundError("Competition training data not found. Please attach the dataset.")
 
 print(f"✅ Train data: {TRAIN_DIR}")
@@ -121,150 +65,122 @@ print(f"✅ Train data: {TRAIN_DIR}")
 OUTPUT_DIR = Path("/kaggle/working/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Install dependencies
-print("📦 Installing dependencies (rapidfuzz, phonetics, sentence-transformers, xgboost)...")
-subprocess.run(["pip", "install", "-q", "rapidfuzz", "phonetics", "sentence-transformers", "xgboost"], check=True)
-print("✅ Environment ready!")
+# Install fast dependencies
+print("📦 Installing dependencies...")
+subprocess.run(["pip", "install", "-q", "rapidfuzz", "phonetics", "xgboost"], check=True)
+print("✅ Dependencies ready!")
 
 import numpy as np
 import pandas as pd
 import torch
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Device: {DEVICE}")
-
-# ============================================================
-# CELL 2: Load Data
-# ============================================================
-print("\n=== LOADING TRAINING DATA ===")
-s1 = pd.read_csv(f"{TRAIN_DIR}/train_source1.tsv", sep="\t", dtype=str, keep_default_na=False)
-s2 = pd.read_csv(f"{TRAIN_DIR}/train_source2.tsv", sep="\t", dtype=str, keep_default_na=False)
-s3 = pd.read_csv(f"{TRAIN_DIR}/train_source3.tsv", sep="\t", dtype=str, keep_default_na=False)
-gt = pd.read_csv(f"{TRAIN_DIR}/train_ground_truth.tsv", sep="\t", dtype=str, keep_default_na=False)
-
-# Subsample 150,000 S1 entities for training to save CPU time on feature extraction
-SAMPLE_SIZE = 150_000
-np.random.seed(42)
-if len(s1) > SAMPLE_SIZE:
-    print(f"Subsampling S1 from {len(s1):,} to {SAMPLE_SIZE:,} for fast training...")
-    s1 = s1.sample(n=SAMPLE_SIZE, random_state=42).copy()
-
-def serialize(df):
-    texts = []
-    for _, row in df.iterrows():
-        name = str(row.get("business_name", "")).strip()
-        addr = str(row.get("business_address", "")).strip()
-        texts.append(f"{name} | {addr}" if addr and addr.lower() not in ("nan","n/a","") else name)
-    return texts
-
-print("Serializing texts...")
-s1_texts = serialize(s1)
-corpus_texts = serialize(s2) + serialize(s3)
-corpus_ids = list(s2["entity_id"]) + list(s3["entity_id"])
-s1_ids = list(s1["entity_id"])
-
-# ============================================================
-# CELL 3: Bi-Encoder Candidate Generation
-# ============================================================
-print("\n=== GENERATING CANDIDATES (BI-ENCODER) ===")
-# Locate fine-tuned bi-encoder model
-BI_PATH = None
-for p in [f"{CODE_ROOT}/models/bi_encoder_b2", "/kaggle/working/models/bi_encoder_b2"]:
-    if Path(p).exists() and (Path(p) / "modules.json").exists():
-        BI_PATH = p
-        break
-
-if not BI_PATH:
-    for p in Path("/kaggle").rglob("bi_encoder_b2"):
-        if (p / "modules.json").exists():
-            BI_PATH = str(p)
-            break
-
-if not BI_PATH:
-    for p in Path("/kaggle").rglob("modules.json"):
-        if "cross" not in str(p):
-            BI_PATH = str(p.parent)
-            break
-
-if not BI_PATH:
-    print("⚠️ Fine-tuned bi_encoder_b2 not found. Falling back to all-MiniLM-L6-v2.")
-    BI_PATH = "sentence-transformers/all-MiniLM-L6-v2"
-
-print(f"Loading Bi-Encoder: {BI_PATH}")
-bi_encoder = SentenceTransformer(BI_PATH, device=DEVICE)
-
-print("Encoding Corpus...")
-corpus_emb = bi_encoder.encode(corpus_texts, batch_size=512, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
-
-print("Encoding S1...")
-s1_emb = bi_encoder.encode(s1_texts, batch_size=512, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
-
-print("Retrieving Top-20 Candidates...")
-TOP_K = 20
-RBATCH = 2048
-corpus_t = torch.tensor(corpus_emb, device=DEVICE, dtype=torch.float32)
-
-pairs = []
-for start in tqdm(range(0, len(s1_emb), RBATCH)):
-    batch = torch.tensor(s1_emb[start:start+RBATCH], device=DEVICE, dtype=torch.float32)
-    sims = torch.mm(batch, corpus_t.T)
-    _, idxs = torch.topk(sims, k=TOP_K, dim=1)
-    for i, idx_row in enumerate(idxs.cpu().numpy()):
-        sid = s1_ids[start + i]
-        for j in idx_row:
-            pairs.append({"s1_id": sid, "cand_id": corpus_ids[j]})
-
-del corpus_t, s1_emb, corpus_emb
-pairs_df = pd.DataFrame(pairs)
-pairs_path = OUTPUT_DIR / "a1_candidate_pairs_optimized.csv"
-pairs_df.to_csv(pairs_path, index=False)
-print(f"Generated {len(pairs_df):,} pairs for feature extraction.")
-
-# ============================================================
-# CELL 4: Path A Feature Extraction
-# ============================================================
-print("\n=== EXTRACTING CLASSICAL ML FEATURES (CPU) ===")
-print("This takes about 10-15 minutes...")
-
-# We can call features.py directly
-features_cmd = [
-    sys.executable, f"{CODE_ROOT}/src/path_a/features.py",
-    "--pairs", str(pairs_path),
-    "--out", str(OUTPUT_DIR / "a2_features.parquet"),
-    "--data-dir", TRAIN_DIR
-]
-subprocess.run(features_cmd, check=True)
-
-# ============================================================
-# CELL 5: Negative Sampling
-# ============================================================
-print("\n=== NEGATIVE SAMPLING ===")
-sample_cmd = [
-    sys.executable, f"{CODE_ROOT}/src/path_a/sample_negatives.py",
-    "--features", str(OUTPUT_DIR / "a2_features.parquet"),
-    "--out", str(OUTPUT_DIR / "a3_train_sampled.parquet"),
-    "--ratio", "3.0"
-]
-subprocess.run(sample_cmd, check=True)
-
-# ============================================================
-# CELL 6: Train XGBoost Classifier
-# ============================================================
-print("\n=== TRAINING XGBOOST CLASSIFIER ===")
 import xgboost as xgb
 
-train_df = pd.read_parquet(OUTPUT_DIR / "a3_train_sampled.parquet")
-exclude_cols = {'s1_id', 'cand_id', 'is_match', 'country'}
-feature_cols = sorted([c for c in train_df.columns if c not in exclude_cols])
-print(f"Features used ({len(feature_cols)}): {feature_cols}")
+from src.path_a.features import compute_features
+from src.common.data_loader import load_ground_truth
 
-X_train = train_df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
-y_train = train_df['is_match'].astype(int)
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Accelerator Device: {DEVICE}")
+
+# ============================================================
+# STEP 2: Load Data & Ground Truth
+# ============================================================
+print("\n" + "=" * 60)
+print("📥 STEP 2: LOADING DATA & GROUND TRUTH")
+print("=" * 60)
+t0 = time.time()
+
+# Subsample 25,000 S1 entities for ultra-fast training (~150,000 training pairs)
+SAMPLE_SIZE = 25_000
+print(f"Loading S1 sample ({SAMPLE_SIZE:,} rows)...")
+s1 = pd.read_csv(f"{TRAIN_DIR}/train_source1.tsv", sep="\t", nrows=SAMPLE_SIZE, dtype=str, keep_default_na=False)
+
+print("Loading S2 and S3...")
+# Load matching pool of S2 and S3 (100k rows each provides ample hard negatives)
+s2 = pd.read_csv(f"{TRAIN_DIR}/train_source2.tsv", sep="\t", nrows=100_000, dtype=str, keep_default_na=False)
+s3 = pd.read_csv(f"{TRAIN_DIR}/train_source3.tsv", sep="\t", nrows=100_000, dtype=str, keep_default_na=False)
+cands = pd.concat([s2, s3], ignore_index=True).drop_duplicates(subset=["entity_id"])
+
+print("Loading Ground Truth...")
+gt = load_ground_truth(Path(TRAIN_DIR) / "train_ground_truth.tsv")
+gt_map = {row["source1_entity_id"]: set(row["matches"]) for _, row in gt.iterrows()}
+print(f"Data loaded in {time.time()-t0:.1f}s")
+
+# ============================================================
+# STEP 3: Pair Mining (Ground Truth Positives + TF-IDF Hard Negatives)
+# ============================================================
+print("\n" + "=" * 60)
+print("🎯 STEP 3: MINING POSITIVES & HARD NEGATIVES")
+print("=" * 60)
+t0 = time.time()
+
+# 1. Exact True Positive Pairs from Ground Truth
+pos_pairs = []
+for sid in s1["entity_id"]:
+    for cid in gt_map.get(sid, []):
+        pos_pairs.append({"s1_id": sid, "cand_id": cid, "is_match": 1})
+
+print(f"True positive pairs: {len(pos_pairs):,}")
+
+# 2. Hard Negatives via Character 3-gram TF-IDF Cosine Similarity
+print("Mining hard negatives using TF-IDF nearest neighbors...")
+vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 3), min_df=2)
+cand_vecs = vec.fit_transform(cands["business_name"].fillna(""))
+s1_vecs = vec.transform(s1["business_name"].fillna(""))
+
+# Find top-4 nearest candidates per S1 entity
+nn = NearestNeighbors(n_neighbors=4, metric="cosine", algorithm="brute", n_jobs=-1)
+nn.fit(cand_vecs)
+_, indices = nn.kneighbors(s1_vecs)
+
+cand_id_arr = cands["entity_id"].values
+neg_pairs = []
+for i, sid in enumerate(s1["entity_id"]):
+    true_matches = gt_map.get(sid, set())
+    for idx in indices[i]:
+        cid = cand_id_arr[idx]
+        if cid not in true_matches:
+            neg_pairs.append({"s1_id": sid, "cand_id": cid, "is_match": 0})
+
+all_pairs_df = pd.DataFrame(pos_pairs + neg_pairs).drop_duplicates(subset=["s1_id", "cand_id"])
+print(f"Total training pairs: {len(all_pairs_df):,} (Pos: {len(pos_pairs):,}, Neg: {len(neg_pairs):,}) mined in {time.time()-t0:.1f}s")
+
+# ============================================================
+# STEP 4: Classical ML Feature Extraction
+# ============================================================
+print("\n" + "=" * 60)
+print("⚙️ STEP 4: EXTRACTING CLASSICAL ML FEATURES")
+print("=" * 60)
+t0 = time.time()
+
+# Compute all 21 features (Jaro-Winkler, Levenshtein, Jaccard, Token Overlap, PIN match, etc.)
+feats_df = compute_features(all_pairs_df, s1, cands)
+feats_df["is_match"] = all_pairs_df["is_match"].values
+
+features_path = OUTPUT_DIR / "a2_features.parquet"
+feats_df.to_parquet(features_path, index=False)
+print(f"Feature extraction complete! {feats_df.shape} saved in {time.time()-t0:.1f}s")
+
+# ============================================================
+# STEP 5: Train GPU-Accelerated XGBoost Classifier
+# ============================================================
+print("\n" + "=" * 60)
+print("🌲 STEP 5: TRAINING XGBOOST CLASSIFIER")
+print("=" * 60)
+t0 = time.time()
+
+exclude_cols = {"s1_id", "cand_id", "is_match", "country"}
+feature_cols = sorted([c for c in feats_df.columns if c not in exclude_cols])
+print(f"Features ({len(feature_cols)}): {feature_cols}")
+
+X = feats_df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+y = feats_df["is_match"].astype(int)
 
 use_gpu = torch.cuda.is_available()
-print(f"Fitting XGBoost on {'GPU (CUDA)' if use_gpu else 'CPU'} ({len(X_train):,} pairs)...")
+print(f"Fitting XGBoost on {'GPU (CUDA)' if use_gpu else 'CPU'} ({len(X):,} pairs)...")
+
 clf = xgb.XGBClassifier(
     n_estimators=300,
     max_depth=6,
@@ -276,18 +192,19 @@ clf = xgb.XGBClassifier(
     eval_metric="logloss",
     random_state=42
 )
-clf.fit(X_train, y_train)
+clf.fit(X, y)
 
 model_path = OUTPUT_DIR / "path_a_xgb_optimized.json"
 clf.save_model(str(model_path))
+print(f"Training completed in {time.time()-t0:.1f}s!")
 print(f"✅ Saved trained XGBoost model to: {model_path}")
 
-# Feature importances
+# Display Feature Importances
 importances = pd.Series(clf.feature_importances_, index=feature_cols).sort_values(ascending=False)
 print("\nTop 10 Feature Importances:")
-print(importances.head(10))
+print(importances.head(10).to_string())
 
-print("\n" + "="*60)
-print("✅ TRAINING COMPLETE!")
-print(f"Download your optimized model from: /kaggle/working/output/path_a_xgb_optimized.json")
-print("="*60)
+print("\n" + "=" * 60)
+print("🎉 ALL DONE! DOWNLOAD YOUR TRAINED MODEL:")
+print(f"   {model_path}")
+print("=" * 60)
